@@ -12,9 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 1 (Foundation & Application Shell)
-- **Gate Status:** Near-complete. Auth context, board, undo, CI, ADRs, and tests all in place. Awaiting Playwright e2e smoke test.
+- **Gate Status:** Complete. All Phase 1 deliverables, unit tests, e2e smoke tests, CI workflow, and documentation have passed. Ready for v0.1.0 tag cut.
 
 ### Added
+- **Playwright E2E Smoke Test** `tests/e2e/smoke.spec.ts` & `playwright.config.ts`:
+  - Verifies application shell, titlebar, and workspace headers.
+  - Tests AuthModal flow: opens modal, toggles Sign In / Create Account, validates headings, closes modal.
+  - Tests Navigation to Analysis workspace.
+  - Tests board rendering via Chessground (`cg-board`), move position label, board flipping (orientation change), and disabled state of undo when at root.
+  - Added `"test:e2e": "playwright test"` npm script and updated `.github/workflows/ci.yml` to run E2E smoke tests on push/PR.
 - **Undo move** in Analysis workspace (`src/App.tsx`):
   - `undoMove()` trims the last SAN from the `moves[]` array and snaps `historyIndex` to the new end of the line.
   - **Keyboard shortcut `Ctrl+Z` / `Cmd+Z`** wired via `useEffect` — does not fire when focus is inside an `<input>` or `<textarea>`.
@@ -67,9 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [x] Integrate Chessground board component backed by `chess.js` for legal move handling.
 - [x] Setup Vitest unit test suite (8 tests passing).
 - [x] Initialize `docs/licences.md` and ADRs `0001`–`0007`.
-- [x] CI pipeline (`.github/workflows/ci.yml`) — typecheck + tests on push/PR.
-- [ ] Playwright end-to-end smoke test (`tests/e2e/`).
-- [ ] Tag `v0.1.0` once e2e smoke test passes.
+- [x] CI pipeline (`.github/workflows/ci.yml`) — typecheck, unit tests, and Playwright e2e smoke tests on push/PR.
+- [x] Playwright end-to-end smoke test (`tests/e2e/smoke.spec.ts`).
+- [ ] Tag `v0.1.0` once phase sign-off confirmed.
 
 ### Phase 2: Import & Library (Target: v0.2.0)
 - [ ] Implement pure TypeScript PGN parser with fixture test suite in `packages/chess-core`.
