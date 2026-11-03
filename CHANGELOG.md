@@ -12,7 +12,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 3 (Engine & Analysis Pipeline)
-- **Gate Status:** In progress. Preparing Web Worker Stockfish engine, UCI protocol parser, MultiPV (1..3) evaluation, and persistent `game_analyses`/`positions` database migrations.
+- **Gate Status:** In progress — engine pipeline, UCI parser, EvalGraph, MultiPV UI, analysis persistence implemented. Awaiting final E2E verification.
+
+### Added (Phase 3 — unreleased)
+- **Stockfish 19 WASM Engine Integration**:
+  - Installed `stockfish` npm package (v19); copied `stockfish-19-lite-single.js` + `stockfish-19-lite-single.wasm` (1.8 MB) to `public/` for Vite static serving.
+  - `StockfishEngine` class (`src/lib/engine/stockfish-engine.ts`) implementing `Engine` interface with Web Worker isolation, UCI command loop, MultiPV parsing, and fallback inline heuristic engine for Node/Vitest environments.
+- **UCI Parser** (`src/lib/engine/uci-parser.ts`):
+  - `parseUciInfoLine()` parsing `info depth … score cp … pv …` lines; inverts scores when Black is to move to produce consistent White-relative evaluations (ADR 0004).
+  - `uciToSan()` converting UCI moves to SAN via `chess.js`.
+  - `buildPositionEvaluation()` assembling `PositionEvaluation` with MultiPV candidate lines.
+- **Win Probability Module** (`src/lib/engine/win-probability.ts`, ADR 0003):
+  - `calculateWinProbability(scoreCp, mateIn)` → 0..100% using sigmoid formula.
+  - `getMoverWinProbability()` flipping perspective for Black.
+  - `classifyMove(loss, isBestMove)` producing "best" | "good" | "inaccuracy" | "mistake" | "blunder" thresholds.
+- **Game Analyzer Pipeline** (`src/lib/engine/game-analyzer.ts`):
+  - `analyzeGame(game, options)` sequencing through all plies, reporting progress 0–100%, honoring `AbortSignal`.
+  - `computeMoveClassifications(positions)` building `MoveAnalysisReport[]` with win-prob loss per ply.
+- **Analysis Persistence** (`src/lib/analyses.ts`):
+  - `saveAnalysis()` with dual-layer strategy: Supabase upsert (real UUIDs only) + LocalStorage fallback (all sessions).
+  - `getAnalysisForGame()` checking Supabase first, then LocalStorage.
+  - UUID guard prevents test fixtures from triggering Supabase 400 errors.
+- **Database Migrations** (`supabase/migrations/20261103000003_create_game_analyses_and_positions.sql`):
+  - `game_analyses` table: `id`, `game_id`, `user_id`, `engine_name`, `depth`, `multipv`, `status`, progress fields, timestamps.
+  - `positions` table: `ply`, `fen`, `move_san`, `move_uci`, `score_cp`, `mate_in`, `win_probability`, `best_move_uci/san`, `pv_lines` (jsonb), full RLS.
+  - Applied to Supabase project `rjxpuxmwdcqgierciqpg`.
+- **Evaluation Graph Component** (`src/components/EvalGraph.tsx`):
+  - SVG-based win-probability sparkline across all plies (0–100%).
+  - Clickable — clicking a point jumps `historyIndex` to that ply.
+  - Blunder (red) and mistake (yellow) dot markers.
+  - Active ply vertical cursor with live score readout.
+  - Shown below board controls once analysis is complete.
+- **Live Engine UI in Analysis Workspace** (`src/App.tsx`):
+  - `handleAnalyzeGame()` state machine: creates `AbortController`, calls `analyzeGame()`, streams progress, sets `analysisPositions` + `moveReports` on completion.
+  - "Analyse game" button enables when a game is loaded; shows live "Cancel (X%)" during analysis; switches to "Re-analyse" after completion.
+  - Live progress bar (`.analysis-progress-track`) below heading during analysis.
+  - Engine evaluation panel shows live `score_cp`, `mate_in`, MultiPV candidate lines from `currentEval.pv_lines`.
+  - Engine badge shows "SF16" (live, pulsing) when analysis is available, "Offline" otherwise.
+- **Move Classification Badges** in notation panel:
+  - `??` (blunder, red), `?` (mistake, yellow), `?!` (inaccuracy, blue) rendered inline after each move SAN.
+- **Checkmate & Check Banners** in board panel:
+  - `.analysis-checkmate-banner` with slide-in animation rendered when `displayGame.isCheckmate()`.
+  - `.analysis-check-banner` for in-check positions.
+  - Both are distinct from `BoardView`'s own `board-game-over-banner` overlay.
+- **Phase 3 CSS** (`src/styles-phase3.css`):
+  - Progress bar, cancel button, pulsing live badge, candidate lines, rank/score cells, classification badges, checkmate/check banners.
+- **ADR 0009** (`docs/decisions/0009-analysis-pipeline-and-caching.md`):
+  - Dual-layer persistence, UUID guard, sequential ply evaluation, WASM delivery rationale.
+- **Engine Type System** (`src/lib/engine/types.ts`):
+  - `EngineConfig`, `CandidateLine`, `PositionEvaluation`, `MoveAnalysisReport`, `GameAnalysisRecord`, `PositionRecord`, `AnalysisStatus`, `MoveClassification`, `Engine` interface.
+- **30 Unit Tests Passing** (`tests/unit/engine.test.ts`):
+  - Win probability formula, mover perspective, move classification thresholds.
+  - UCI parser White/Black normalization, mate inversion, SAN conversion.
+  - `buildPositionEvaluation` with MultiPV.
+  - `analyzeGame` ply-by-ply Scholar's Mate (8 plies), progress reporting, abort.
+  - `computeMoveClassifications` blunder detection.
+- **E2E Test Suite** (`tests/e2e/smoke.spec.ts`) — 3 tests:
+  - Test 1: App shell navigation, auth modal, board verification (Chessground `.board-container`), flip board, undo disabled.
+  - Test 2: Full import → My Games → Analysis round-trip, metadata, checkmate status, duplicate detection.
+  - Test 3: Engine UI elements — "Analyse game" button disabled without game, enabled with game, eval graph hidden before analysis, notation populated.
 
 ---
 

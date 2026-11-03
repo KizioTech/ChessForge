@@ -10,3 +10,9 @@ dist-electron/
 test-results/
 playwright-report/
 blob-report/
+
+# Stockfish WASM binaries (large, served from public/ at runtime)
+# Restore with: npm run postinstall (or copy from node_modules/stockfish/bin/)
+public/stockfish-19-lite-single.wasm
+public/stockfish-19-single.wasm
+public/stockfish-19.wasm

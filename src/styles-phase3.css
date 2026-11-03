@@ -1,0 +1,198 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 3: Engine Analysis UI Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Analysis progress bar ─────────────────────────────────────── */
+.analysis-progress-track {
+  position: relative;
+  height: 4px;
+  background: var(--raised);
+  border-radius: 2px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.analysis-progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--lime-dark), var(--lime));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.analysis-progress-label {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── Cancel button ─────────────────────────────────────────────── */
+.analysis-cancel-btn {
+  border-color: #ff525240 !important;
+  color: #ff8a80 !important;
+}
+.analysis-cancel-btn:hover {
+  border-color: #ff5252 !important;
+  background: #ff525212 !important;
+}
+
+/* ── Engine badge live ─────────────────────────────────────────── */
+.status-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--lime);
+  border-radius: 50%;
+  margin-right: 4px;
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Candidate lines (MultiPV) ─────────────────────────────────── */
+.candidate-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.candidate-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--raised);
+  font-size: 11px;
+  font-family: var(--mono);
+  transition: background 0.15s;
+}
+
+.candidate-line:hover {
+  background: var(--hover);
+}
+
+.rank-badge {
+  font-size: 10px;
+  color: var(--lime);
+  font-weight: 700;
+  min-width: 16px;
+  text-align: center;
+}
+
+.candidate-san {
+  flex: 1;
+  color: var(--fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-score {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Move classification badges ────────────────────────────────── */
+.badge-blunder,
+.badge-mistake,
+.badge-inaccuracy {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 800;
+  border-radius: 3px;
+  padding: 0px 3px;
+  margin-left: 3px;
+  vertical-align: super;
+  line-height: 1.4;
+  font-family: var(--mono);
+}
+
+.badge-blunder {
+  background: #ff525220;
+  color: #ff5252;
+  border: 1px solid #ff525240;
+}
+
+.badge-mistake {
+  background: #fbbf2420;
+  color: #fbbf24;
+  border: 1px solid #fbbf2440;
+}
+
+.badge-inaccuracy {
+  background: #60a5fa20;
+  color: #60a5fa;
+  border: 1px solid #60a5fa40;
+}
+
+/* ── Checkmate banner ──────────────────────────────────────────── */
+.analysis-checkmate-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, #ff525218, transparent);
+  border: 1px solid #ff525240;
+  border-radius: 6px;
+  margin: 0 0 12px 0;
+  color: #ff8a80;
+  font-size: 12px;
+  animation: banner-fade-in 0.3s ease;
+}
+
+.analysis-checkmate-banner strong {
+  color: #ff5252;
+  font-weight: 700;
+  font-family: var(--display);
+  letter-spacing: 0.04em;
+}
+
+.analysis-checkmate-banner span {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* ── Check banner (warning) ───────────────────────────────────── */
+.analysis-check-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fbbf2412;
+  border: 1px solid #fbbf2435;
+  border-radius: 6px;
+  margin: 0 0 10px 0;
+  color: #fbbf24;
+  font-size: 11px;
+  animation: banner-fade-in 0.3s ease;
+}
+
+.analysis-check-banner strong {
+  font-weight: 600;
+}
+
+@keyframes banner-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+

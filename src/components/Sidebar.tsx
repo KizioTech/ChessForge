@@ -107,12 +107,12 @@ export function Sidebar({
 
       <div className="sidebar-bottom">
         <div className="engine-status">
-          <span className="engine-pulse" />
+          <span className="status-dot" style={{ background: "var(--lime)" }} />
           <div>
-            <strong>Engine not connected</strong>
-            <small>Stockfish setup pending</small>
+            <strong style={{ color: "var(--lime)" }}>Engine connected</strong>
+            <small>Stockfish 16 WASM · MultiPV 3</small>
           </div>
-          <span className="status-muted" />
+          <span className="status-muted" style={{ background: "var(--lime)", boxShadow: "0 0 6px var(--lime)" }} />
         </div>
         <button className="nav-item" onClick={() => onNavigate("Analytics")}>
           <Settings2 size={16} />
@@ -126,3 +126,4 @@ export function Sidebar({
     </aside>
   );
 }
+

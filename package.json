@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "start": "electron .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node -e \"const fs=require('fs');const path=require('path');const src=path.join('node_modules','stockfish','bin','stockfish-19-lite-single');['js','.wasm'].forEach(ext=>{ try{fs.mkdirSync('public',{recursive:true});fs.copyFileSync(src+(ext==='.wasm'?ext:''+ext),path.join('public','stockfish'+(ext==='.wasm'?'-19-lite-single.wasm':'.js')))}catch(e){} });\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -20,7 +21,8 @@
     "chessground": "^9.2.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "stockfish": "^19.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

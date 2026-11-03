@@ -15,8 +15,12 @@ import { AuthModal } from "./components/AuthModal";
 import { ImportDialog } from "./components/ImportDialog";
 import { GameLibrary } from "./components/GameLibrary";
 import { Sidebar } from "./components/Sidebar";
+import { EvalGraph } from "./components/EvalGraph";
 import { useAuth } from "./lib/auth";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
+import { getAnalysisForGame } from "./lib/analyses";
+import { analyzeGame, computeMoveClassifications } from "./lib/engine/game-analyzer";
+import type { PositionRecord, MoveAnalysisReport } from "./lib/engine/types";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -106,6 +110,13 @@ function App() {
   const [games, setGames] = useState<GameRecord[]>([]);
   const [activeGame, setActiveGame] = useState<GameRecord | null>(null);
 
+  // ── Phase 3: Engine analysis state ─────────────────────────────────────────
+  const [analysisPositions, setAnalysisPositions] = useState<PositionRecord[]>([]);
+  const [moveReports, setMoveReports] = useState<MoveAnalysisReport[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisAbortController, setAnalysisAbortController] = useState<AbortController | null>(null);
+
   const refreshGames = useCallback(() => {
     getGames(user?.id).then(setGames);
   }, [user?.id]);
@@ -115,6 +126,12 @@ function App() {
   }, [refreshGames]);
 
   function openAnalysisForGame(gameRecord: GameRecord) {
+    // Clear prior analysis state whenever a new game is loaded
+    setAnalysisPositions([]);
+    setMoveReports([]);
+    setIsAnalyzing(false);
+    setAnalysisProgress(0);
+    setAnalysisAbortController(null);
     try {
       const chess = new Chess(gameRecord.start_fen || undefined);
       chess.loadPgn(gameRecord.pgn, { strict: false });
@@ -128,13 +145,51 @@ function App() {
       setActiveGame(gameRecord);
       setPage("Analysis");
     }
+    // Load cached analysis if available (non-blocking)
+    getAnalysisForGame(gameRecord.id, undefined).then(({ positions }) => {
+      if (positions.length > 0) {
+        setAnalysisPositions(positions);
+        setMoveReports(computeMoveClassifications(positions));
+      }
+    }).catch(() => { /* silently ignore */ });
   }
 
   function handleClearActiveGame() {
+    analysisAbortController?.abort();
     setActiveGame(null);
     setMoves([]);
     setHistoryIndex(0);
     setSelected(null);
+    setAnalysisPositions([]);
+    setMoveReports([]);
+    setIsAnalyzing(false);
+    setAnalysisProgress(0);
+    setAnalysisAbortController(null);
+  }
+
+  async function handleAnalyzeGame() {
+    if (!activeGame || isAnalyzing) return;
+    const controller = new AbortController();
+    setAnalysisAbortController(controller);
+    setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    try {
+      const result = await analyzeGame(activeGame, {
+        depth: 16,
+        multiPv: 3,
+        signal: controller.signal,
+        onProgress: p => setAnalysisProgress(p.percent)
+      });
+      setAnalysisPositions(result.positions);
+      setMoveReports(computeMoveClassifications(result.positions));
+    } catch (err) {
+      if ((err as DOMException).name !== "AbortError") {
+        console.error("Analysis failed:", err);
+      }
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisAbortController(null);
+    }
   }
 
   async function handleDeleteGame(gameId: string) {
@@ -270,6 +325,12 @@ function App() {
             setOrientation={setOrientation}
             activeGame={activeGame}
             onClearActiveGame={handleClearActiveGame}
+            analysisPositions={analysisPositions}
+            moveReports={moveReports}
+            isAnalyzing={isAnalyzing}
+            analysisProgress={analysisProgress}
+            onAnalyzeGame={handleAnalyzeGame}
+            onCancelAnalysis={() => analysisAbortController?.abort()}
           />
         )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
@@ -412,7 +473,13 @@ function Analysis({
   orientation,
   setOrientation,
   activeGame,
-  onClearActiveGame
+  onClearActiveGame,
+  analysisPositions,
+  moveReports,
+  isAnalyzing,
+  analysisProgress,
+  onAnalyzeGame,
+  onCancelAnalysis
 }: {
   game: Chess;
   onMove: (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => void;
@@ -425,7 +492,40 @@ function Analysis({
   setOrientation: React.Dispatch<React.SetStateAction<"white" | "black">>;
   activeGame: GameRecord | null;
   onClearActiveGame: () => void;
+  analysisPositions: PositionRecord[];
+  moveReports: MoveAnalysisReport[];
+  isAnalyzing: boolean;
+  analysisProgress: number;
+  onAnalyzeGame: () => void;
+  onCancelAnalysis: () => void;
 }) {
+  // Build report lookup by ply for badge rendering
+  const reportByPly = useMemo(
+    () => Object.fromEntries(moveReports.map(r => [r.ply, r])),
+    [moveReports]
+  );
+
+  // Current ply evaluation
+  const currentEval = analysisPositions.length > 0
+    ? analysisPositions.find(p => p.ply === historyIndex) ?? analysisPositions[historyIndex] ?? null
+    : null;
+
+  // Derive an eval-rail value from current position evaluation (centipawns → ±N)
+  const evalValue = currentEval
+    ? currentEval.mate_in !== null
+      ? (currentEval.mate_in > 0 ? 5 : -5)
+      : (currentEval.score_cp ?? 0) / 100
+    : 0;
+
+  const evalLabel = currentEval
+    ? currentEval.mate_in !== null
+      ? `M${Math.abs(currentEval.mate_in)}`
+      : `${currentEval.score_cp && currentEval.score_cp > 0 ? "+" : ""}${((currentEval.score_cp ?? 0) / 100).toFixed(2)}`
+    : "—";
+
+  const isCheckmatePosition = game.isCheckmate();
+  const isCheckPosition = game.inCheck() && !game.isCheckmate();
+
   return <div className="content analysis-content">
     <div className="analysis-heading">
       <div>
@@ -457,9 +557,31 @@ function Analysis({
           </button>
         )}
         <button className="button button-secondary"><MoreHorizontal size={15}/> Options</button>
-        <button className="button button-primary"><Sparkles size={14}/> Analyse game</button>
+        {isAnalyzing ? (
+          <button className="button button-secondary analysis-cancel-btn" onClick={onCancelAnalysis}>
+            <X size={14}/> Cancel ({analysisProgress}%)
+          </button>
+        ) : (
+          <button
+            className="button button-primary"
+            onClick={onAnalyzeGame}
+            disabled={!activeGame}
+            title={!activeGame ? "Load a game from your library to analyse it" : undefined}
+          >
+            <Sparkles size={14}/> {analysisPositions.length > 0 ? "Re-analyse" : "Analyse game"}
+          </button>
+        )}
       </div>
     </div>
+
+    {/* Progress bar */}
+    {isAnalyzing && (
+      <div className="analysis-progress-track">
+        <div className="analysis-progress-bar" style={{ width: `${analysisProgress}%` }} />
+        <span className="analysis-progress-label">Analysing… {analysisProgress}%</span>
+      </div>
+    )}
+
     <div className="analysis-meta panel">
       <div className="player">
         <div className="player-avatar white-avatar">W</div>
@@ -483,12 +605,13 @@ function Analysis({
         {activeGame ? (activeGame.user_colour && activeGame.user_colour !== "unknown" ? `YOU PLAYED ${activeGame.user_colour.toUpperCase()}` : activeGame.result) : "FREE ANALYSIS"}
       </span>
     </div>
+
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline">
           <span><span className="live-dot"/> BOARD</span>
           <span className="turn-label">
-            {game.isCheckmate() ? (
+            {isCheckmatePosition ? (
               <span className="status-pill status-checkmate" style={{ color: "#ff5252", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                 <Crown size={13} /> CHECKMATE · {game.turn() === "w" ? "Black" : "White"} wins
               </span>
@@ -496,7 +619,7 @@ function Analysis({
               <span className="status-pill status-draw" style={{ color: "#fbbf24", fontWeight: 600 }}>
                 DRAW · {game.isStalemate() ? "Stalemate" : "Drawn game"}
               </span>
-            ) : game.inCheck() ? (
+            ) : isCheckPosition ? (
               <span className="status-pill status-check" style={{ color: "#ff5252", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                 <AlertTriangle size={13} /> {game.turn() === "w" ? "White" : "Black"} in check
               </span>
@@ -505,7 +628,25 @@ function Analysis({
             )}
           </span>
         </div>
-        <div className="board-stage"><EvaluationRail/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
+
+        {/* Checkmate banner */}
+        {isCheckmatePosition && (
+          <div className="analysis-checkmate-banner">
+            <Crown size={18}/>
+            <strong>{game.turn() === "w" ? "Black" : "White"} wins by checkmate</strong>
+            <span>Game over</span>
+          </div>
+        )}
+
+        {/* Check highlight banner */}
+        {isCheckPosition && (
+          <div className="analysis-check-banner">
+            <AlertTriangle size={15}/>
+            <strong>{game.turn() === "w" ? "White" : "Black"} is in check</strong>
+          </div>
+        )}
+
+        <div className="board-stage"><EvaluationRail value={evalValue}/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
         <div className="board-controls">
           <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>
           <button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move (←)"><ChevronLeft size={16}/></button>
@@ -523,17 +664,93 @@ function Analysis({
           </button>
           <button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button>
         </div>
+
+        {/* Evaluation Graph — shown below board controls once analysis is available */}
+        {analysisPositions.length > 1 && (
+          <EvalGraph
+            positions={analysisPositions}
+            currentPly={historyIndex}
+            onSelectPly={goToMove}
+            reports={moveReports}
+          />
+        )}
       </section>
+
       <aside className="analysis-side">
-        <section className="panel evaluation-panel"><div className="panel-head"><div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div><span className="engine-badge"><span className="status-muted"/> Offline</span></div><div className="eval-main"><span className="eval-score">—</span><span className="eval-caption">Stockfish not connected</span></div><div className="engine-placeholder"><Zap size={15}/><span>Connect the local engine to calculate evaluations and candidate lines.</span></div><div className="engine-settings"><span>Depth <b>—</b></span><span>MultiPV <b>—</b></span><span>Engine <b>Stockfish</b></span></div></section>
+        {/* Engine Evaluation Panel */}
+        <section className="panel evaluation-panel">
+          <div className="panel-head">
+            <div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div>
+            {currentEval ? (
+              <span className="engine-badge"><span className="status-live"/> SF16</span>
+            ) : (
+              <span className="engine-badge"><span className="status-muted"/> Offline</span>
+            )}
+          </div>
+          {currentEval ? (
+            <>
+              <div className="eval-main">
+                <span className="eval-score">{evalLabel}</span>
+                <span className="eval-caption">
+                  {currentEval.mate_in !== null
+                    ? `Forced mate in ${Math.abs(currentEval.mate_in)}`
+                    : evalValue > 1 ? "White is better" : evalValue < -1 ? "Black is better" : "Roughly equal"}
+                </span>
+              </div>
+              {/* MultiPV candidate lines */}
+              {currentEval.pv_lines && currentEval.pv_lines.length > 0 && (
+                <div className="candidate-lines">
+                  {currentEval.pv_lines.map((line: any) => (
+                    <div key={line.rank} className="candidate-line">
+                      <span className="rank-badge">{line.rank === 1 ? "★" : `${line.rank}.`}</span>
+                      <span className="candidate-san">{line.san || line.uci || "—"}</span>
+                      <span className="candidate-score">
+                        {line.mateIn !== null
+                          ? `M${Math.abs(line.mateIn)}`
+                          : `${line.scoreCp && line.scoreCp > 0 ? "+" : ""}${((line.scoreCp ?? 0) / 100).toFixed(2)}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="engine-settings">
+                <span>Depth <b>16</b></span>
+                <span>MultiPV <b>3</b></span>
+                <span>Engine <b>Stockfish 16</b></span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="eval-main"><span className="eval-score">—</span><span className="eval-caption">{isAnalyzing ? "Calculating…" : "Run analysis to see evaluation"}</span></div>
+              <div className="engine-placeholder"><Zap size={15}/><span>{isAnalyzing ? `Analysis in progress… ${analysisProgress}%` : "Click \"Analyse game\" above to evaluate with Stockfish."}</span></div>
+              <div className="engine-settings"><span>Depth <b>—</b></span><span>MultiPV <b>—</b></span><span>Engine <b>Stockfish</b></span></div>
+            </>
+          )}
+        </section>
+
+        {/* Moves / Notation Panel */}
         <section className="panel moves-panel"><div className="panel-head"><div><div className="eyebrow">NOTATION</div><h2>Moves</h2></div><span className="move-count">{history.length} plies</span></div>
           {history.length===0 ? <div className="moves-empty"><div className="moves-empty-board">♟</div><strong>Ready for a game</strong><p>Make legal moves on the board or import a PGN to review a real game.</p></div> :
-            <div className="move-list">{movePairs.map((pair:any,i:number)=><div className="move-row" key={pair.n}><span className="move-number">{pair.n}.</span><button className={historyIndex===i*2+1?"move-active":""} onClick={()=>goToMove(i*2+1)}>{pair.white?.san||"—"}</button><button className={historyIndex===i*2+2?"move-active":""} onClick={()=>goToMove(i*2+2)}>{pair.black?.san||""}</button></div>)}</div>}
+            <div className="move-list">{movePairs.map((pair:any,i:number)=><div className="move-row" key={pair.n}><span className="move-number">{pair.n}.</span>
+              <button className={historyIndex===i*2+1?"move-active":""} onClick={()=>goToMove(i*2+1)}>
+                {pair.white?.san||"—"}
+                {reportByPly[i*2+1]?.classification === "blunder" && <span className="badge-blunder" title="Blunder">??</span>}
+                {reportByPly[i*2+1]?.classification === "mistake" && <span className="badge-mistake" title="Mistake">?</span>}
+                {reportByPly[i*2+1]?.classification === "inaccuracy" && <span className="badge-inaccuracy" title="Inaccuracy">?!</span>}
+              </button>
+              <button className={historyIndex===i*2+2?"move-active":""} onClick={()=>goToMove(i*2+2)}>
+                {pair.black?.san||""}
+                {reportByPly[i*2+2]?.classification === "blunder" && <span className="badge-blunder" title="Blunder">??</span>}
+                {reportByPly[i*2+2]?.classification === "mistake" && <span className="badge-mistake" title="Mistake">?</span>}
+                {reportByPly[i*2+2]?.classification === "inaccuracy" && <span className="badge-inaccuracy" title="Inaccuracy">?!</span>}
+              </button>
+            </div>)}</div>}
         </section>
+
         <section className="panel lesson-panel"><div className="panel-head"><div><div className="eyebrow">LEARNING NOTES</div><h2>What to look for</h2></div><Brain size={16} className="muted"/></div><div className="lesson-empty"><Sparkles size={15}/><span>After engine analysis, ChessForge will explain critical moments and suggest positions worth practising.</span></div></section>
       </aside>
     </div>
-    <div className="analysis-footnote"><ShieldCheck size={13}/> This is a local interface preview. No live-game assistance or engine evaluation is active.</div>
+    <div className="analysis-footnote"><ShieldCheck size={13}/> Engine analysis is for post-game review only. No live-game assistance is ever provided.</div>
   </div>;
 }
 
