@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Current Status
-- **Active Phase:** Phase 2 (Import & Game Library)
-- **Gate Status:** Feature-complete. Migration, client-side PGN parser, SHA-256 fingerprint deduplication, interactive Import dialog, and Game Library view implemented and verified with 16 unit tests and 2 E2E tests.
+- **Active Phase:** Phase 3 (Engine & Analysis Pipeline)
+- **Gate Status:** In progress. Preparing Web Worker Stockfish engine, UCI protocol parser, MultiPV (1..3) evaluation, and persistent `game_analyses`/`positions` database migrations.
+
+---
+
+## [0.2.0] - 2026-11-03
 
 ### Added
 - **Independent Sidebar Component (`src/components/Sidebar.tsx`)**:

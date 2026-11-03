@@ -67,8 +67,8 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 2: Import & Game Library
-- **Status:** In Progress (Current Active Dev Phase)
-- **Release Target:** `v0.2.0` (Milestone 2)
+- **Status:** Complete (Signed off)
+- **Release Target:** `v0.2.0` (Milestone 2 — Tag Cut)
 - **Goal:** Robust client-side PGN parsing, validation, deduplication, and game library management.
 - **Scope & Deliverables:**
   1. Database migrations: `games` and `platform_accounts` tables with RLS and user ownership constraints.
@@ -77,14 +77,15 @@ Before closing any phase, every item below must be satisfied:
   4. Import UI: Drag-and-drop file upload (up to 5 MB), paste PGN dialog, import report (valid vs. malformed breakdown).
   5. Library view: Search, filters (platform, color, result, time control, date), move navigators.
 - **Phase Exit Criteria:**
-  - [ ] 40 real games imported with zero duplicates upon re-upload.
-  - [ ] Malformed PGN fixtures produce descriptive, non-crashing error messages.
-  - [ ] Library filters and move navigation fully functional.
+  - [x] 40 real games imported with zero duplicates upon re-upload.
+  - [x] Malformed PGN fixtures produce descriptive, non-crashing error messages.
+  - [x] Library filters, pagination, and move navigation fully functional.
+  - [x] Phase 2 checklist complete; tag `v0.2.0` cut.
 
 ---
 
 ### Phase 3: Engine & Analysis Pipeline
-- **Status:** Locked (Pending Phase 2 completion)
+- **Status:** In Progress (Current Active Dev Phase)
 - **Release Target:** `v0.3.0` (Milestone 3)
 - **Goal:** Web Worker Stockfish engine execution and analysis storage.
 - **Scope & Deliverables:**
