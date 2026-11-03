@@ -6,3 +6,4 @@
  */
 export { useAuth, AuthProvider, OAUTH_CALLBACK_URL } from "./AuthContext";
 export type { AuthContextValue as AuthState } from "./AuthContext";
+export type { UserProfile } from "./supabase";

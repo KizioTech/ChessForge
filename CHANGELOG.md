@@ -15,6 +15,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Gate Status:** Feature-complete. Migration, client-side PGN parser, SHA-256 fingerprint deduplication, interactive Import dialog, and Game Library view implemented and verified with 16 unit tests and 2 E2E tests.
 
 ### Added
+- **Independent Sidebar Component (`src/components/Sidebar.tsx`)**:
+  - Extracted navigation and profile switcher from `App.tsx` into a modular, self-contained `<Sidebar />` component.
+  - Implemented independent scrolling container (`height: 100%`, `overflow-y: auto`, slim scrollbar) isolating sidebar navigation from main content scroll events.
+- **Fixed Viewport Header Layout (`src/styles.css`)**:
+  - Fixed application titlebar header (`height: 40px`, `position: sticky`, `z-index: 50`) at the top of the viewport.
+  - Bounded `.app-body` to `calc(100vh - 40px)` with `overflow: hidden`, isolating `.main-area` (`overflow-y: auto`) and `.sidebar` (`overflow-y: auto`) into independent scrolling regions.
+- **Paginated Game Library with "See more" Option (`src/components/GameLibrary.tsx`)**:
+  - Configured defined page size (`PAGE_SIZE = 10`) for game list rendering.
+  - Added "See more games (X remaining)" button with smooth expansion.
+  - Automatic pagination reset whenever search query, platform, color, result, speed, or sort order changes.
+- **Dynamic Analysis Workspace Metadata (`src/App.tsx`)**:
+  - Replaced hardcoded demo position values ("makawa7 · 1,205", "Opponent · unrated", "DEMO POSITION") with dynamic game metadata.
+  - Populates player names, Elo ratings, time control, platform tag ("LIBRARY GAME"), moves count, and played date directly from `activeGame`.
+  - Added "New board" action button to reset to a blank free-analysis sandbox.
+- **E2E Test Pipeline Hardening**:
+  - Prepend `npm run build` to `test:e2e` in `package.json` to prevent Vite preview from serving stale production bundles during local and CI test execution.
+  - Added assertions in `tests/e2e/smoke.spec.ts` verifying real game metadata renders and "DEMO POSITION" text is absent.
 - **Database migration** `supabase/migrations/20261103000001_create_games_and_platform_accounts.sql`:
   - `platform_accounts` table with unique constraint on `(user_id, platform, username)` and strict RLS policies.
   - `games` table with unique constraint on `(user_id, fingerprint)`, partial index for `(user_id, platform, external_id)`, and performance indexes on `played_at`, `platform`, and `fingerprint`.

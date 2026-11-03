@@ -14,6 +14,7 @@ import { BoardView } from "./components/BoardView";
 import { AuthModal } from "./components/AuthModal";
 import { ImportDialog } from "./components/ImportDialog";
 import { GameLibrary } from "./components/GameLibrary";
+import { Sidebar } from "./components/Sidebar";
 import { useAuth } from "./lib/auth";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
 
@@ -35,23 +36,6 @@ function ChessKnight({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
-const navGroups = [
-  { label: "WORKSPACE", items: [
-    { name: "Dashboard" as Page, icon: LayoutDashboard },
-    { name: "My Games" as Page, icon: FolderOpen },
-    { name: "Analysis" as Page, icon: Activity }
-  ]},
-  { label: "IMPROVE", items: [
-    { name: "Train" as Page, icon: Crosshair },
-    { name: "Review Queue" as Page, icon: CalendarClock },
-    { name: "Openings" as Page, icon: BookOpen },
-    { name: "Endgames" as Page, icon: Crown }
-  ]},
-  { label: "INSIGHTS", items: [
-    { name: "Analytics" as Page, icon: BarChart3 }
-  ]}
-];
 
 const initialFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const pieceGlyph: Record<string, string> = {
@@ -120,6 +104,7 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
   const [games, setGames] = useState<GameRecord[]>([]);
+  const [activeGame, setActiveGame] = useState<GameRecord | null>(null);
 
   const refreshGames = useCallback(() => {
     getGames(user?.id).then(setGames);
@@ -137,10 +122,19 @@ function App() {
       setMoves(sanMoves);
       setHistoryIndex(sanMoves.length);
       setOrientation(gameRecord.user_colour === "black" ? "black" : "white");
+      setActiveGame(gameRecord);
       setPage("Analysis");
     } catch {
+      setActiveGame(gameRecord);
       setPage("Analysis");
     }
+  }
+
+  function handleClearActiveGame() {
+    setActiveGame(null);
+    setMoves([]);
+    setHistoryIndex(0);
+    setSelected(null);
   }
 
   async function handleDeleteGame(gameId: string) {
@@ -243,28 +237,14 @@ function App() {
     </header>
 
     <div className="app-body">
-      {sidebarOpen && <aside className="sidebar">
-        <div className="profile-switcher" onClick={() => !user && setShowAuthModal(true)} style={{ cursor: "pointer" }}>
-          <div className="profile-avatar">{userInitials}</div>
-          <div className="profile-copy"><strong>{userDisplayName}</strong><span>{user ? user.email : "Personal account (sign in)"}</span></div>
-          <ChevronDown size={14} className="muted"/>
-        </div>
-        {navGroups.map(group => <div className="nav-group" key={group.label}>
-          <div className="nav-label">{group.label}</div>
-          {group.items.map(item => {
-            const Icon = item.icon;
-            return <button key={item.name} className={`nav-item ${page===item.name?"active":""}`} onClick={() => setPage(item.name)}>
-              <Icon size={16}/><span>{item.name}</span>
-              {item.name==="Review Queue" && <span className="nav-count">0</span>}
-            </button>;
-          })}
-        </div>)}
-        <div className="sidebar-bottom">
-          <div className="engine-status"><span className="engine-pulse"/><div><strong>Engine not connected</strong><small>Stockfish setup pending</small></div><span className="status-muted"/></div>
-          <button className="nav-item"><Settings2 size={16}/><span>Settings</span></button>
-          <div className="sidebar-foot"><span>CHESSFORGE</span><span>v0.1.0 · Preview</span></div>
-        </div>
-      </aside>}
+      <Sidebar
+        page={page}
+        onNavigate={setPage}
+        user={user}
+        profile={profile}
+        onOpenAuth={() => setShowAuthModal(true)}
+        isOpen={sidebarOpen}
+      />
 
       <main className="main-area">
         <div className="page-toolbar">
@@ -277,7 +257,21 @@ function App() {
 
         {page === "Dashboard" && <Dashboard games={games} onNavigate={setPage} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame}/>}
         {page === "My Games" && <GameLibrary games={games} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame} onDeleteGame={handleDeleteGame} />}
-        {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} onUndo={undoMove} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove} orientation={orientation} setOrientation={setOrientation}/>}
+        {page === "Analysis" && (
+          <Analysis
+            game={displayGame}
+            onMove={makeMove}
+            onUndo={undoMove}
+            history={history}
+            movePairs={movePairs}
+            historyIndex={historyIndex}
+            goToMove={goToMove}
+            orientation={orientation}
+            setOrientation={setOrientation}
+            activeGame={activeGame}
+            onClearActiveGame={handleClearActiveGame}
+          />
+        )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
       </main>
     </div>
@@ -407,10 +401,88 @@ function StatCard({ label, value, change, icon, tone }: {label:string;value:stri
   return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tone||""}`}>{icon}</span></div><div className="stat-value">{value}</div><div className="stat-change">{change}</div></div>;
 }
 
-function Analysis({ game, onMove, onUndo, history, movePairs, historyIndex, goToMove, orientation, setOrientation }: any) {
+function Analysis({
+  game,
+  onMove,
+  onUndo,
+  history,
+  movePairs,
+  historyIndex,
+  goToMove,
+  orientation,
+  setOrientation,
+  activeGame,
+  onClearActiveGame
+}: {
+  game: Chess;
+  onMove: (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => void;
+  onUndo: () => void;
+  history: any[];
+  movePairs: any[];
+  historyIndex: number;
+  goToMove: (i: number) => void;
+  orientation: "white" | "black";
+  setOrientation: React.Dispatch<React.SetStateAction<"white" | "black">>;
+  activeGame: GameRecord | null;
+  onClearActiveGame: () => void;
+}) {
   return <div className="content analysis-content">
-    <div className="analysis-heading"><div><div className="eyebrow">GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span></div><h1>Analysis workspace</h1><p className="subheading">Explore a position, navigate moves and inspect the analysis layout.</p></div><div className="analysis-actions"><button className="button button-secondary"><MoreHorizontal size={15}/> Options</button><button className="button button-primary"><Sparkles size={14}/> Analyse game</button></div></div>
-    <div className="analysis-meta panel"><div className="player"><div className="player-avatar white-avatar">W</div><div><strong>White</strong><span>makawa7 · 1,205</span></div></div><span className="versus">VS</span><div className="player"><div className="player-avatar black-avatar">B</div><div><strong>Black</strong><span>Opponent · unrated</span></div></div><div className="meta-divider"/><div className="meta-item"><Clock3 size={14}/> Rapid · 10+0</div><div className="meta-item"><CalendarClock size={14}/> Sample game</div><span className="sample-label">DEMO POSITION</span></div>
+    <div className="analysis-heading">
+      <div>
+        <div className="eyebrow">
+          {activeGame ? (
+            <>
+              <Sparkles size={13}/> {activeGame.platform.toUpperCase()} GAME
+              <span className="demo-pill" style={{ color: "var(--lime)", borderColor: "var(--lime-dark)", background: "#1c2a1e" }}>
+                LIBRARY GAME
+              </span>
+            </>
+          ) : (
+            <>
+              GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span>
+            </>
+          )}
+        </div>
+        <h1>Analysis workspace</h1>
+        <p className="subheading">
+          {activeGame
+            ? `${activeGame.white} (${activeGame.white_elo || "unrated"}) vs ${activeGame.black} (${activeGame.black_elo || "unrated"}) · Result: ${activeGame.result} · ${activeGame.moves_count} moves`
+            : "Explore a position, navigate moves and inspect the analysis layout."}
+        </p>
+      </div>
+      <div className="analysis-actions">
+        {activeGame && (
+          <button className="button button-secondary" onClick={onClearActiveGame} title="Clear loaded game and start new board">
+            <Plus size={14}/> New board
+          </button>
+        )}
+        <button className="button button-secondary"><MoreHorizontal size={15}/> Options</button>
+        <button className="button button-primary"><Sparkles size={14}/> Analyse game</button>
+      </div>
+    </div>
+    <div className="analysis-meta panel">
+      <div className="player">
+        <div className="player-avatar white-avatar">W</div>
+        <div>
+          <strong>{activeGame ? activeGame.white : "White"}</strong>
+          <span>{activeGame ? (activeGame.white_elo ? `${activeGame.white_elo} Elo` : "Unrated") : "Free position"}</span>
+        </div>
+      </div>
+      <span className="versus">VS</span>
+      <div className="player">
+        <div className="player-avatar black-avatar">B</div>
+        <div>
+          <strong>{activeGame ? activeGame.black : "Black"}</strong>
+          <span>{activeGame ? (activeGame.black_elo ? `${activeGame.black_elo} Elo` : "Unrated") : "Free position"}</span>
+        </div>
+      </div>
+      <div className="meta-divider"/>
+      <div className="meta-item"><Clock3 size={14}/> {activeGame ? `${activeGame.time_class || "Game"} · ${activeGame.time_control || "No clock"}` : "Untimed"}</div>
+      <div className="meta-item"><CalendarClock size={14}/> {activeGame ? (activeGame.played_at ? new Date(activeGame.played_at).toLocaleDateString() : (activeGame.termination || "Finished")) : "Local board"}</div>
+      <span className="sample-label" style={{ color: activeGame ? "var(--lime)" : "var(--muted)", fontWeight: activeGame ? 600 : 400 }}>
+        {activeGame ? (activeGame.user_colour && activeGame.user_colour !== "unknown" ? `YOU PLAYED ${activeGame.user_colour.toUpperCase()}` : activeGame.result) : "FREE ANALYSIS"}
+      </span>
+    </div>
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline">

@@ -3,3 +3,4 @@
 
 alter table public.games
 add column if not exists moves_count integer not null default 0;
+

@@ -113,6 +113,14 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
     await analyseBtn.click();
     await expect(page.locator("h1")).toHaveText("Analysis workspace");
 
+    // Verify dynamic game metadata in Analysis header & meta bar (no demo text)
+    await expect(page.locator(".analysis-meta")).toContainText("makawa7");
+    await expect(page.locator(".analysis-meta")).toContainText("GrandmasterX");
+    await expect(page.locator(".analysis-meta")).toContainText("1205 Elo");
+    await expect(page.locator(".analysis-meta")).toContainText("1190 Elo");
+    await expect(page.locator(".sample-label")).toHaveText("1-0");
+    await expect(page.getByText("DEMO POSITION")).not.toBeVisible();
+
     // Verify board and notation are populated
     await expect(page.locator(".move-count")).toContainText("7 plies");
     await expect(page.getByText("Qxf7#")).toBeVisible();

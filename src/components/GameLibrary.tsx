@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   FolderOpen,
   Search,
@@ -10,9 +10,12 @@ import {
   Trash2,
   Trophy,
   Activity,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronDown
 } from "lucide-react";
 import type { GameRecord } from "../lib/games";
+
+const PAGE_SIZE = 10;
 
 interface GameLibraryProps {
   games: GameRecord[];
@@ -33,6 +36,12 @@ export function GameLibrary({
   const [resultFilter, setResultFilter] = useState("all");
   const [timeClassFilter, setTimeClassFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, platformFilter, colorFilter, resultFilter, timeClassFilter, sortOrder]);
 
   const filteredGames = useMemo(() => {
     return games
@@ -332,7 +341,7 @@ export function GameLibrary({
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {filteredGames.map(g => {
+          {filteredGames.slice(0, visibleCount).map(g => {
             const opp = getOpponentText(g);
             return (
               <div
@@ -438,6 +447,24 @@ export function GameLibrary({
               </div>
             );
           })}
+
+          {/* See more pagination controls */}
+          {visibleCount < filteredGames.length ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "18px 0 28px" }}>
+              <button
+                className="button button-secondary"
+                onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                style={{ padding: "0 22px", height: "34px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <span>See more games ({filteredGames.length - visibleCount} remaining)</span>
+                <ChevronDown size={14} />
+              </button>
+            </div>
+          ) : filteredGames.length > PAGE_SIZE ? (
+            <div style={{ textAlign: "center", padding: "16px 0", color: "var(--muted)", fontSize: "11px" }}>
+              All {filteredGames.length} games displayed
+            </div>
+          ) : null}
         </div>
       )}
     </div>
