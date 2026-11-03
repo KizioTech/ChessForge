@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 1 (Foundation & Application Shell)
-- **Gate Status:** Near-complete. Auth context, board, CI, ADRs, and tests all in place. Awaiting Playwright e2e smoke test.
+- **Gate Status:** Near-complete. Auth context, board, undo, CI, ADRs, and tests all in place. Awaiting Playwright e2e smoke test.
 
 ### Added
+- **Undo move** in Analysis workspace (`src/App.tsx`):
+  - `undoMove()` trims the last SAN from the `moves[]` array and snaps `historyIndex` to the new end of the line.
+  - **Keyboard shortcut `Ctrl+Z` / `Cmd+Z`** wired via `useEffect` — does not fire when focus is inside an `<input>` or `<textarea>`.
+  - **Arrow key navigation** via the same `useEffect`: `←` = previous move, `→` = next move.
+  - Undo button rendered in board controls bar; disabled/dimmed when there are no moves to undo.
 - **`src/lib/AuthContext.tsx`** — React context provider (`AuthProvider`) that owns a single global `onAuthStateChange` listener. All components that call `useAuth()` share one session, one user object, and one profile — no duplicated listeners or stale state after sign-in / sign-out.
 - **`src/main.tsx`** — wrapped `<App />` in `<AuthProvider>` so the context is available throughout the tree.
 - **`src/lib/auth.ts`** — simplified to a re-export barrel (`useAuth`, `AuthProvider`, `OAUTH_CALLBACK_URL`, `AuthState`) for backward-compatible imports.

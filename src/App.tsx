@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Chess, type Square } from "chess.js";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight,
@@ -7,7 +7,7 @@ import {
   Command, Crosshair, Crown, Database, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
-  X, Zap, LogIn, LogOut, User as UserIcon
+  X, Zap, LogIn, LogOut, User as UserIcon, Undo2
 } from "lucide-react";
 import type { Page } from "./types";
 import { BoardView } from "./components/BoardView";
@@ -157,6 +157,32 @@ function App() {
     setSelected(null);
   }
 
+  /** Remove the last move from the line and step back to it. */
+  function undoMove() {
+    if (moves.length === 0) return;
+    const newMoves = moves.slice(0, -1);
+    setMoves(newMoves);
+    // Stay at the end of the (now shorter) line
+    setHistoryIndex(newMoves.length);
+    setSelected(null);
+  }
+
+  // Keyboard shortcuts: ← / → navigate, Ctrl+Z undo
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // Don't fire when typing in an input / textarea
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft")  { e.preventDefault(); goToMove(historyIndex - 1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); goToMove(historyIndex + 1); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); undoMove(); }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyIndex, moves]);
+
   const movePairs = [];
   for (let i=0; i<history.length; i+=2) movePairs.push({ n: i/2+1, white: history[i], black: history[i+1] });
 
@@ -219,7 +245,7 @@ function App() {
         </div>
 
         {page === "Dashboard" && <Dashboard onNavigate={setPage} onImport={() => setShowImport(true)}/>}
-        {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove} orientation={orientation} setOrientation={setOrientation}/>}
+        {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} onUndo={undoMove} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove} orientation={orientation} setOrientation={setOrientation}/>}
         {page !== "Dashboard" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
       </main>
     </div>
@@ -278,7 +304,7 @@ function StatCard({ label, value, change, icon, tone }: {label:string;value:stri
   return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tone||""}`}>{icon}</span></div><div className="stat-value">{value}</div><div className="stat-change">{change}</div></div>;
 }
 
-function Analysis({ game, onMove, history, movePairs, historyIndex, goToMove, orientation, setOrientation }: any) {
+function Analysis({ game, onMove, onUndo, history, movePairs, historyIndex, goToMove, orientation, setOrientation }: any) {
   return <div className="content analysis-content">
     <div className="analysis-heading"><div><div className="eyebrow">GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span></div><h1>Analysis workspace</h1><p className="subheading">Explore a position, navigate moves and inspect the analysis layout.</p></div><div className="analysis-actions"><button className="button button-secondary"><MoreHorizontal size={15}/> Options</button><button className="button button-primary"><Sparkles size={14}/> Analyse game</button></div></div>
     <div className="analysis-meta panel"><div className="player"><div className="player-avatar white-avatar">W</div><div><strong>White</strong><span>makawa7 · 1,205</span></div></div><span className="versus">VS</span><div className="player"><div className="player-avatar black-avatar">B</div><div><strong>Black</strong><span>Opponent · unrated</span></div></div><div className="meta-divider"/><div className="meta-item"><Clock3 size={14}/> Rapid · 10+0</div><div className="meta-item"><CalendarClock size={14}/> Sample game</div><span className="sample-label">DEMO POSITION</span></div>
@@ -286,7 +312,23 @@ function Analysis({ game, onMove, history, movePairs, historyIndex, goToMove, or
       <section className="board-panel panel">
         <div className="board-topline"><span><span className="live-dot"/> BOARD</span><span className="turn-label">{game.turn()==="w"?"White":"Black"} to move</span></div>
         <div className="board-stage"><EvaluationRail/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
-        <div className="board-controls"><button className="icon-btn" onClick={()=>goToMove(0)} title="Start"><ArrowLeft size={15}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move"><ChevronLeft size={16}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move"><ChevronRight size={16}/></button><button className="icon-btn" onClick={()=>goToMove(history.length)} title="End"><ArrowRight size={15}/></button><span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span><button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button></div>
+        <div className="board-controls">
+          <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>
+          <button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move (←)"><ChevronLeft size={16}/></button>
+          <button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move (→)"><ChevronRight size={16}/></button>
+          <button className="icon-btn" onClick={()=>goToMove(history.length)} title="Go to end"><ArrowRight size={15}/></button>
+          <span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span>
+          <button
+            className="icon-btn"
+            onClick={onUndo}
+            disabled={history.length === 0}
+            title="Undo last move (Ctrl+Z)"
+            style={{ marginLeft: "auto", opacity: history.length === 0 ? 0.3 : 1 }}
+          >
+            <Undo2 size={15}/>
+          </button>
+          <button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button>
+        </div>
       </section>
       <aside className="analysis-side">
         <section className="panel evaluation-panel"><div className="panel-head"><div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div><span className="engine-badge"><span className="status-muted"/> Offline</span></div><div className="eval-main"><span className="eval-score">—</span><span className="eval-caption">Stockfish not connected</span></div><div className="engine-placeholder"><Zap size={15}/><span>Connect the local engine to calculate evaluations and candidate lines.</span></div><div className="engine-settings"><span>Depth <b>—</b></span><span>MultiPV <b>—</b></span><span>Engine <b>Stockfish</b></span></div></section>

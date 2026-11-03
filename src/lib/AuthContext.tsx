@@ -133,3 +133,4 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 }
+
