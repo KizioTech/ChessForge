@@ -47,8 +47,8 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 1: Foundation & Application Shell
-- **Status:** In Progress (Current Active Dev Phase)
-- **Release Target:** `v0.1.0` (Milestone 1)
+- **Status:** Complete (Signed off)
+- **Release Target:** `v0.1.0` (Milestone 1 — Tag Cut)
 - **Goal:** Establish project infrastructure, authentication, database schema baseline, and interactive board.
 - **Scope & Deliverables:**
   1. Monorepo / workspace setup, TypeScript strict configuration, ESLint, Prettier, Vitest, CI workflow.
@@ -59,10 +59,10 @@ Before closing any phase, every item below must be satisfied:
   6. License and ADRs: `docs/licences.md` initialized with licenses for Stockfish (GPLv3), Chessground, and chess.js; ADRs 0001 through 0007 documented.
   7. End-to-end smoke test: Playwright test verifying sign-in, navigation, and legal piece movement.
 - **Phase Exit Criteria:**
-  - [ ] User can authenticate, view the application shell, and play legal moves on the board.
-  - [ ] CI pipeline runs typecheck, lint, and tests cleanly on push.
-  - [ ] Supabase RLS policies verified by automated tests.
-  - [ ] Phase 1 checklist complete; tag `v0.1.0` cut.
+  - [x] User can authenticate, view the application shell, and play legal moves on the board.
+  - [x] CI pipeline runs typecheck, lint, and tests cleanly on push.
+  - [x] Supabase RLS policies verified by automated tests.
+  - [x] Phase 1 checklist complete; tag `v0.1.0` cut.
 
 ---
 

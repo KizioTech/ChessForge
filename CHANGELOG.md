@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Current Status
-- **Active Phase:** Phase 1 (Foundation & Application Shell)
-- **Gate Status:** Complete. All Phase 1 deliverables, unit tests, e2e smoke tests, CI workflow, and documentation have passed. Ready for v0.1.0 tag cut.
+- **Active Phase:** Phase 1 Complete · Ready to enter Phase 2 (Import & Library)
+- **Gate Status:** Complete. All Phase 1 deliverables, unit tests, e2e smoke tests, CI workflow, and documentation verified. Tag `v0.1.0` cut.
+
+---
+
+## [0.1.0] - 2026-11-03
 
 ### Added
 - **Playwright E2E Smoke Test** `tests/e2e/smoke.spec.ts` & `playwright.config.ts`:
@@ -29,26 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/lib/AuthContext.tsx`** — React context provider (`AuthProvider`) that owns a single global `onAuthStateChange` listener. All components that call `useAuth()` share one session, one user object, and one profile — no duplicated listeners or stale state after sign-in / sign-out.
 - **`src/main.tsx`** — wrapped `<App />` in `<AuthProvider>` so the context is available throughout the tree.
 - **`src/lib/auth.ts`** — simplified to a re-export barrel (`useAuth`, `AuthProvider`, `OAUTH_CALLBACK_URL`, `AuthState`) for backward-compatible imports.
-
-### Fixed
-- **UI not reflecting logged-in state after sign-in** — root cause: `App.tsx` and `AuthModal.tsx` each called `useAuth()`, creating two independent hook instances with separate React state. When `signInWithPassword` resolved and `onAuthStateChange` fired, the `App` instance could miss or lag the update. Fixed by lifting all auth state into a single `AuthContext` — one listener, one source of truth, all subscribers update atomically.
-
-### Added
-- **CI pipeline** `.github/workflows/ci.yml` — runs TypeScript typecheck and Vitest unit tests on every push and pull request to `main`. Uses Node 22, `npm ci`, and concurrency cancellation for stale runs.
+- **Chessground Drawable Support**: enabled right-click square circles and drag arrows with multi-color brush modifiers (Shift, Alt, Ctrl).
+- **CI pipeline** `.github/workflows/ci.yml` — runs TypeScript typecheck, Vitest unit tests, and Playwright e2e smoke tests on every push and pull request to `main`.
 - **AuthModal full rewrite** `src/components/AuthModal.tsx`:
   - Primary form: email + password sign-in and sign-up (toggle between modes inline).
   - Secondary option: "Continue with Google" OAuth button (uses Supabase `signInWithOAuth` with `redirectTo` callback URL).
   - Show/hide password toggle.
-  - Inline mode switch (sign-in ↔ create account) without closing the modal.
-  - Error state display; loading spinner on submit.
-  - Graceful unconfigured-Supabase fallback (no crash if env vars missing).
-- **Chess move state architecture fix** `src/App.tsx`:
-  - Replaced `game: Chess` state (FEN snapshot) with `moves: string[]` state (ordered list of SAN strings).
-  - `game` is now a derived `useMemo` that replays all SAN moves on a fresh `Chess()` from the starting position — no move-history loss.
-  - `displayGame` is derived from `history.slice(0, historyIndex)` using `m.san` strings (not verbose move objects), eliminating the `before`/`after` FEN mismatch crash.
-  - `makeMove` validates against the current display position, then appends the resulting SAN to the `moves` array and truncates any future branch — correct branching behaviour.
-- Added `Lock`, `Eye`, `EyeOff` imports to `AuthModal`; removed unused `Mail` (kept), `CheckCircle` (removed) dependencies.
-- **Interactive `BoardView`** component in `src/components/BoardView.tsx` wrapping `chessground` with `chess.js` legal move enforcement, drag/drop, and pawn promotion modal. (Previously added.)
+- **Interactive `BoardView`** component in `src/components/BoardView.tsx` wrapping `chessground` with `chess.js` legal move enforcement, drag/drop, and pawn promotion modal.
 - **`useAuth` hook** `src/lib/auth.ts` — all four auth methods: `signInWithPassword`, `signUpWithPassword`, `signInWithGoogle` (OAuth), `signInWithEmail` (magic link). Callback URL: `https://rjxpuxmwdcqgierciqpg.supabase.co/auth/v1/callback`.
 - Authentication status integrated into titlebar and sidebar (initials avatar, sign-in/sign-out).
 - ADRs `0001`–`0007` in `docs/decisions/` covering technology choices, RLS, evaluation storage, engine worker, package boundaries, PGN strategy, and licensing.
@@ -56,9 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Supabase client helper `src/lib/supabase.ts`.
 - License registry `docs/licences.md`.
 - Unit test suites: `tests/unit/chess-rules.test.ts` (6 tests), `tests/unit/supabase.test.ts` (2 tests) — all 8 pass.
+- Playwright E2E test suite: `tests/e2e/smoke.spec.ts` (1 passed).
 
 ### Fixed
 - **Analysis page crash on Black's first move** — root cause: `makeMove` was creating `new Chess(fen)` (losing history), then `displayGame` replayed verbose move objects (with `before`/`after` FEN fields) against a fresh `Chess()`, causing FEN mismatch. Fixed by switching to SAN-array state and SAN-based replay.
+- **UI not reflecting logged-in state after sign-in** — root cause: multiple `useAuth()` instances created separate states; lifted into single `AuthContext`.
 - **Auth modal used magic link only** — fully rewritten to email+password primary flow with Google OAuth as alternative.
 - Fixed TypeScript compiler error (`TS2305: 'ChessKnight'` missing from lucide-react) — replaced with inline SVG component.
 - Resolved Electron binary initialization failure — post-install download and `allowScripts` configured.
