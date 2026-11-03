@@ -11,8 +11,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Current Status
-- **Active Phase:** Phase 4 (Mistakes, Exercise Generation & Spaced Repetition)
-- **Gate Status:** Phase 3 signed off at `v0.3.0` (commit `ff87fb5`). Phase 4 now active.
+- **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
+- **Gate Status:** Phase 4 completed and signed off at `v1.0.0` (Release 1 - The Loop Complete).
+
+---
+
+## [1.0.0] - 2026-11-03
+
+### Release 1: The Loop Complete
+Completes the core continuous training loop: game import -> Stockfish WASM analysis -> automated mistake detection -> exercise generation with eligibility rules -> modified SM-2 spaced repetition review queue -> interactive solving desk -> data sovereignty export.
+
+### Added
+- **Database Migration 000004 (`supabase/migrations/20261103000004_create_training_and_exercises.sql`)**:
+  - `mistakes` table with engine classification, win percentage loss, best moves, and RLS.
+  - `training_exercises` table with unique constraint on `(user_id, fen)`, solutions jsonb, blunder moves, and difficulty.
+  - `review_schedule` table with SM-2 state: `interval_days`, `ease_factor`, `repetitions`, `lapses`, `due_at`.
+  - `exercise_attempts` table capturing user solving attempts, duration, hints used, and SM-2 grades.
+  - `training_sessions` table tracking user study sessions.
+  - Pushed to remote Supabase project `rjxpuxmwdcqgierciqpg`.
+- **Modified SM-2 Spaced Repetition Engine (`src/lib/training/sm2.ts`)**:
+  - Full implementation of Section 3.8: initial ease factor 2.50, minimum ease factor 1.30.
+  - Grade transitions: `Again` (10-minute reset, lapse penalty), `Hard` (1.2x interval scaling, ease penalty), `Good` (1d -> 3d -> interval * ease), `Easy` (1.3x boost, ease boost).
+  - Interval ceiling at 60 days.
+  - Automatic mastery classification when 5 consecutive Good or Easy grades are achieved.
+  - Grade inference engine (`inferGrade`) estimating performance from duration and hint usage.
+- **Automated Exercise Eligibility Generator (`src/lib/training/exercise-generator.ts`)**:
+  - Section 3.7 eligibility filtering:
+    1. Player color match: only user mistakes and blunders become exercises.
+    2. Decided position filter: restricts positions to 10%–90% win probability before move.
+    3. Task clarity: verifies best move beats second-best by >= 8% win probability or captures acceptable multi-solution candidate sets.
+    4. Capped at 3 exercises per game, prioritized by largest win-probability loss.
+    5. Automatic FEN deduplication.
+  - Automatic exercise classification into `Attack` (tactical punch), `Defence` (resilient hold), and `Avoid the blunder` (avoid the game mistake).
+- **Dual-Layer Training Persistence (`src/lib/training/training-service.ts`)**:
+  - Mirrored storage: remote Supabase upserts for authenticated sessions + LocalStorage offline sync.
+  - Functions: `saveGeneratedExercises`, `getDueExercises`, `recordAttemptAndAdvanceSchedule`, `flagExercise`, `getTrainingStats`.
+  - Metric computation: real-time due count, active count, mastered count, streak days, and blunders per 100 moves.
+- **Interactive Training Solving Desk (`src/components/TrainingDesk.tsx`)**:
+  - Interactive chessboard solving environment reusing `BoardView`.
+  - Dynamic objective prompt and exercise type chips.
+  - Real-game blunder comparison: alerts player if they replay their original blunder.
+  - 2-tier hint assistance (1: piece indicator, 2: destination square).
+  - Solution reveal option.
+  - "Bad exercise" flagging modal with categorization reasons to retire noisy positions.
+  - SM-2 performance rating selector with auto-inferred recommendations.
+  - Session progress tracker and celebratory completion summary.
+- **Review Queue Browser (`src/components/ReviewQueue.tsx`)**:
+  - Spaced repetition queue manager showing due exercises, active library, and mastered positions.
+  - Due status indicators, repetition counts, and interval lengths.
+  - One-click "Start training" CTA.
+- **User Data Sovereignty & Export (FR-112, `src/lib/export.ts`)**:
+  - `exportGamesToPgn()`: exports all library games into multi-game PGN format.
+  - `exportAllDataAsJson()`: comprehensive client backup containing games, mistakes, exercises, review schedules, and attempt histories.
+  - Download trigger in toolbar for instant offline archiving.
+- **ADR 0010 (`docs/decisions/0010-spaced-repetition-and-exercise-eligibility.md`)**:
+  - Documented SM-2 design, Section 3.7 eligibility rules, and data sovereignty policies.
+- **Unit & E2E Test Suite Expansion**:
+  - 13 unit tests for SM-2, exercise generator, and exports (`tests/unit/training.test.ts`) — total 43 unit tests passing.
+  - E2E smoke test covering Review Queue navigation, Training Desk, and PGN export — total 4 E2E tests passing.
 
 ---
 

@@ -4,7 +4,7 @@ import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight,
   ArrowUpRight, BarChart3, BookOpen, Brain, CalendarClock, Check,
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, CloudDownload,
-  Command, Crosshair, Crown, Database, FileUp, Filter, Flame, FolderOpen,
+  Command, Crosshair, Crown, Database, Download, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
   X, Zap, LogIn, LogOut, User as UserIcon, Undo2
@@ -16,11 +16,20 @@ import { ImportDialog } from "./components/ImportDialog";
 import { GameLibrary } from "./components/GameLibrary";
 import { Sidebar } from "./components/Sidebar";
 import { EvalGraph } from "./components/EvalGraph";
+import { TrainingDesk } from "./components/TrainingDesk";
+import { ReviewQueue } from "./components/ReviewQueue";
 import { useAuth } from "./lib/auth";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
 import { getAnalysisForGame } from "./lib/analyses";
 import { analyzeGame, computeMoveClassifications } from "./lib/engine/game-analyzer";
 import type { PositionRecord, MoveAnalysisReport } from "./lib/engine/types";
+import { generateExercisesFromGame } from "./lib/training/exercise-generator";
+import {
+  saveGeneratedExercises,
+  getTrainingStats,
+  type TrainingStats
+} from "./lib/training/training-service";
+import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "./lib/export";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -117,9 +126,23 @@ function App() {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisAbortController, setAnalysisAbortController] = useState<AbortController | null>(null);
 
+  // ── Phase 4: Training & Spaced Repetition stats ────────────────────────────
+  const [trainingStats, setTrainingStats] = useState<TrainingStats>({
+    dueCount: 0,
+    totalActive: 0,
+    masteredCount: 0,
+    streakDays: 0,
+    blundersPer100Moves: 0
+  });
+
+  const refreshTrainingStats = useCallback(() => {
+    setTrainingStats(getTrainingStats(user?.id));
+  }, [user?.id]);
+
   const refreshGames = useCallback(() => {
     getGames(user?.id).then(setGames);
-  }, [user?.id]);
+    refreshTrainingStats();
+  }, [user?.id, refreshTrainingStats]);
 
   useEffect(() => {
     refreshGames();
@@ -181,7 +204,24 @@ function App() {
         onProgress: p => setAnalysisProgress(p.percent)
       });
       setAnalysisPositions(result.positions);
-      setMoveReports(computeMoveClassifications(result.positions));
+      const classifications = computeMoveClassifications(result.positions);
+      setMoveReports(classifications);
+
+      // Phase 4: Automatically generate training exercises and mistakes from analysis
+      try {
+        const generated = generateExercisesFromGame({
+          game: activeGame,
+          positions: result.positions,
+          reports: classifications,
+          userColour: activeGame.user_colour === "black" ? "black" : "white"
+        });
+        if (generated.exercises.length > 0 || generated.mistakes.length > 0) {
+          await saveGeneratedExercises(generated.mistakes, generated.exercises, user?.id);
+          refreshTrainingStats();
+        }
+      } catch (genErr) {
+        console.warn("Exercise generation non-fatal error:", genErr);
+      }
     } catch (err) {
       if ((err as DOMException).name !== "AbortError") {
         console.error("Analysis failed:", err);
@@ -307,10 +347,30 @@ function App() {
           <div className="toolbar-right">
             <div className="search-box"><Search size={14}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search ChessForge"/><kbd>⌘ K</kbd></div>
             <button className="button button-secondary" onClick={() => setShowImport(true)}><Upload size={14}/> Import games</button>
+            {games.length > 0 && (
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  const pgn = exportGamesToPgn(games);
+                  triggerDownload(pgn, "chessforge-games.pgn", "application/x-chess-pgn");
+                }}
+                title="Export all games to PGN"
+              >
+                <Download size={14}/> Export PGN
+              </button>
+            )}
           </div>
         </div>
 
-        {page === "Dashboard" && <Dashboard games={games} onNavigate={setPage} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame}/>}
+        {page === "Dashboard" && (
+          <Dashboard
+            games={games}
+            trainingStats={trainingStats}
+            onNavigate={setPage}
+            onImport={() => setShowImport(true)}
+            onOpenAnalysis={openAnalysisForGame}
+          />
+        )}
         {page === "My Games" && <GameLibrary games={games} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame} onDeleteGame={handleDeleteGame} />}
         {page === "Analysis" && (
           <Analysis
@@ -333,7 +393,22 @@ function App() {
             onCancelAnalysis={() => analysisAbortController?.abort()}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
+        {page === "Train" && (
+          <TrainingDesk
+            onBackToDashboard={() => { refreshTrainingStats(); setPage("Dashboard"); }}
+            onNavigateToQueue={() => { refreshTrainingStats(); setPage("Review Queue"); }}
+            userId={user?.id}
+          />
+        )}
+        {page === "Review Queue" && (
+          <ReviewQueue
+            onStartSession={() => setPage("Train")}
+            userId={user?.id}
+          />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && (
+          <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
+        )}
       </main>
     </div>
     <ImportDialog
@@ -348,11 +423,13 @@ function App() {
 
 function Dashboard({
   games,
+  trainingStats,
   onNavigate,
   onImport,
   onOpenAnalysis
 }: {
   games: GameRecord[];
+  trainingStats: TrainingStats;
   onNavigate: (p: Page) => void;
   onImport: () => void;
   onOpenAnalysis: (g: GameRecord) => void;
@@ -369,8 +446,20 @@ function Dashboard({
         icon={<Activity size={16}/>}
         tone={games.length > 0 ? "lime" : undefined}
       />
-      <StatCard label="REVIEW POSITIONS" value="—" change="No review data yet" icon={<Target size={16}/>} />
-      <StatCard label="TRAINING STREAK" value="0 days" change="Your first session awaits" icon={<Flame size={16}/>} />
+      <StatCard
+        label="REVIEW POSITIONS"
+        value={trainingStats.dueCount > 0 ? `${trainingStats.dueCount} due` : trainingStats.totalActive > 0 ? `${trainingStats.totalActive} active` : "0"}
+        change={trainingStats.dueCount > 0 ? "Ready for spaced repetition" : trainingStats.totalActive > 0 ? "All caught up" : "Analyse games to generate"}
+        icon={<Target size={16}/>}
+        tone={trainingStats.dueCount > 0 ? "lime" : undefined}
+      />
+      <StatCard
+        label="TRAINING STREAK"
+        value={`${trainingStats.streakDays} days`}
+        change={trainingStats.streakDays > 0 ? "Habit active" : "Your first session awaits"}
+        icon={<Flame size={16}/>}
+        tone={trainingStats.streakDays > 0 ? "lime" : undefined}
+      />
     </div>
     <div className="dashboard-grid">
       <section className="panel training-feature">

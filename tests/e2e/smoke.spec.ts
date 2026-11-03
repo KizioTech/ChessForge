@@ -199,4 +199,50 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
     await expect(page.locator(".move-count")).toContainText("7 plies");
     await expect(page.getByText("Qxf7#")).toBeVisible();
   });
+
+  test("validates Review Queue, Training Desk, and Data Export features", async ({ page }) => {
+    await page.goto("/");
+
+    // 1. Navigate to Review Queue
+    const reviewNav = page.locator("button.nav-item", { hasText: "Review Queue" });
+    await reviewNav.click();
+    await expect(page.locator("h1")).toHaveText("Review Queue");
+    await expect(page.getByText("SPACED REPETITION ENGINE")).toBeVisible();
+    await expect(page.getByText("DUE TODAY", { exact: true })).toBeVisible();
+    await expect(page.getByText("MASTERED", { exact: true })).toBeVisible();
+
+    // 2. Navigate to Train
+    const trainNav = page.locator("button.nav-item", { hasText: "Train" });
+    await trainNav.click();
+    // In clean state with 0 due exercises, it shows the all-caught-up view
+    await expect(page.getByText(/You're all caught up!|DAILY TRAINING QUEUE/)).toBeVisible();
+
+    // 3. Return to Dashboard
+    const dashNav = page.locator("button.nav-item", { hasText: "Dashboard" });
+    await dashNav.click();
+    await expect(page.locator("h1")).toContainText("Good afternoon");
+
+    // 4. Import a game and verify Export PGN button appears
+    const importBtn = page.getByRole("button", { name: "Import games" }).first();
+    await importBtn.click();
+    await page.getByRole("button", { name: "Paste PGN text" }).click();
+
+    const samplePgn = `[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.11.03"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1/2-1/2"]
+
+1. e4 e5 2. Nf3 Nc6 1/2-1/2`;
+
+    await page.locator("textarea.pgn-textarea").fill(samplePgn);
+    await page.getByRole("button", { name: "Import games" }).last().click();
+    await expect(page.getByText("Import Complete")).toBeVisible();
+    await page.getByRole("button", { name: "View in My Games" }).click();
+
+    // Export button should be visible in toolbar
+    const exportBtn = page.getByRole("button", { name: "Export PGN" });
+    await expect(exportBtn).toBeVisible();
+  });
 });

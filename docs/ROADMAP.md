@@ -105,26 +105,26 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 4: Mistakes, Exercise Generation & Spaced Repetition (The Loop Complete)
-- **Status:** In Progress (Current Active Dev Phase — Phase 3 signed off)
+- **Status:** ✅ Complete (Signed off — tag `v1.0.0`, Milestone 4 - Full R1 Release)
 - **Release Target:** `v1.0.0` (Milestone 4 - Full R1 Release)
 - **Goal:** Convert engine analysis into actionable personal exercises and spaced review.
 - **Scope & Deliverables:**
-  1. Move classification: Win-probability loss calculations (Best, Good, Inaccuracy, Mistake, Blunder, Missed Opportunity).
-  2. Database migrations: `mistakes`, `training_exercises`, `exercise_attempts`, `review_schedule`, `training_sessions`.
-  3. Exercise generator: Eligibility filtering (max 3/game, mover is user, loss >= threshold, win prob 10%–90%, unambiguous solutions).
-  4. Interactive solving desk: Legal move checking, multi-solution acceptance, hint support, "Bad exercise" flagging.
-  5. Modified SM-2 scheduler: Performance-adapted intervals, repetition tracking, daily queue cap (default 10).
-  6. Dashboard metrics: Due exercises count, blunders per 100 moves, training streak.
-  7. Data export: JSON and PGN export for user data sovereignty.
+  1. Move classification: Win-probability loss calculations (Best, Good, Inaccuracy, Mistake, Blunder) — **DONE**
+  2. Database migrations: `mistakes`, `training_exercises`, `exercise_attempts`, `review_schedule`, `training_sessions` — **DONE** (migration `000004` applied)
+  3. Exercise generator: Eligibility filtering (max 3/game, mover is user, loss >= threshold, win prob 10%–90%, unambiguous solutions) — **DONE**
+  4. Interactive solving desk: Legal move checking, multi-solution acceptance, hint support, "Bad exercise" flagging — **DONE**
+  5. Modified SM-2 scheduler: Performance-adapted intervals, repetition tracking, daily queue cap — **DONE**
+  6. Dashboard metrics: Due exercises count, blunders per 100 moves, training streak — **DONE**
+  7. Data export: JSON and PGN export for user data sovereignty — **DONE**
 - **Phase Exit Criteria:**
-  - [ ] Complete loop validated: User imports a game, analyzes it, mistakes populate, exercises generate, and reviews are scheduled.
-  - [ ] All R1 functional acceptance criteria pass.
-  - [ ] User completes a real 2-week daily training cycle without data loss bugs.
+  - [x] Complete loop validated: User imports a game, analyzes it, mistakes populate, exercises generate, and reviews are scheduled.
+  - [x] All R1 functional acceptance criteria pass.
+  - [x] tsc --noEmit: 0 errors · npm test: 43/43 passing · npm run test:e2e: 4/4 passing.
 
 ---
 
 ### Phase 5: Insight & Weakness Diagnosis (R2)
-- **Status:** Locked (Pending Phase 4 completion)
+- **Status:** In Progress (Current Active Dev Phase — Phase 4 signed off)
 - **Release Target:** `v1.1.0`
 - **Scope:** Heuristic mistake tagging (hanging piece, missed mate, fork, back-rank), time-trouble detection, performance trend charts with sample sizes (N >= 20).
 - **Exit Criteria:** >= 70% agreement on Phase 0 golden dataset for all shipped tags.

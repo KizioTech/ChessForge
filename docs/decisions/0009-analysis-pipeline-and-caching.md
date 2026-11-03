@@ -78,3 +78,4 @@ Classification badges (`??`, `?`, `?!`) are rendered inline in the move notation
 - **Positive:** The 1.8 MB lite WASM file loads in < 2s on broadband and performs depth-16 analysis adequately for club-level game review.
 - **Negative:** The 94 MB full-NNUE variant is not shipped (too large for web); lite-single runs without NNUE nets, which reduces top-level accuracy but is sufficient for blunder/mistake detection.
 - **Trade-off:** Sequential ply evaluation means a 40-move game takes ~20–40 s depending on hardware. A future parallel-ply variant could be explored once SharedArrayBuffer is widely available without COOP/COEP constraints.
+
