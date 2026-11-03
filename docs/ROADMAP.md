@@ -67,7 +67,7 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 2: Import & Game Library
-- **Status:** Locked (Pending Phase 1 completion)
+- **Status:** In Progress (Current Active Dev Phase)
 - **Release Target:** `v0.2.0` (Milestone 2)
 - **Goal:** Robust client-side PGN parsing, validation, deduplication, and game library management.
 - **Scope & Deliverables:**

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chess, type Square } from "chess.js";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight,
@@ -12,7 +12,10 @@ import {
 import type { Page } from "./types";
 import { BoardView } from "./components/BoardView";
 import { AuthModal } from "./components/AuthModal";
+import { ImportDialog } from "./components/ImportDialog";
+import { GameLibrary } from "./components/GameLibrary";
 import { useAuth } from "./lib/auth";
+import { getGames, deleteGame, type GameRecord } from "./lib/games";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -116,6 +119,34 @@ function App() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
+  const [games, setGames] = useState<GameRecord[]>([]);
+
+  const refreshGames = useCallback(() => {
+    getGames(user?.id).then(setGames);
+  }, [user?.id]);
+
+  useEffect(() => {
+    refreshGames();
+  }, [refreshGames]);
+
+  function openAnalysisForGame(gameRecord: GameRecord) {
+    try {
+      const chess = new Chess(gameRecord.start_fen || undefined);
+      chess.loadPgn(gameRecord.pgn, { strict: false });
+      const sanMoves = chess.history();
+      setMoves(sanMoves);
+      setHistoryIndex(sanMoves.length);
+      setOrientation(gameRecord.user_colour === "black" ? "black" : "white");
+      setPage("Analysis");
+    } catch {
+      setPage("Analysis");
+    }
+  }
+
+  async function handleDeleteGame(gameId: string) {
+    await deleteGame(gameId, user?.id);
+    refreshGames();
+  }
 
   // Replay all moves up to the full length to build the "master" game state
   const game = useMemo(() => {
@@ -244,22 +275,45 @@ function App() {
           </div>
         </div>
 
-        {page === "Dashboard" && <Dashboard onNavigate={setPage} onImport={() => setShowImport(true)}/>}
+        {page === "Dashboard" && <Dashboard games={games} onNavigate={setPage} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame}/>}
+        {page === "My Games" && <GameLibrary games={games} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame} onDeleteGame={handleDeleteGame} />}
         {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} onUndo={undoMove} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove} orientation={orientation} setOrientation={setOrientation}/>}
-        {page !== "Dashboard" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
       </main>
     </div>
-    {showImport && <ImportDialog onClose={() => setShowImport(false)}/>}
+    <ImportDialog
+      isOpen={showImport}
+      onClose={() => setShowImport(false)}
+      onImportComplete={refreshGames}
+      onNavigateToGames={() => setPage("My Games")}
+    />
     <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
   </div>;
 }
 
-function Dashboard({ onNavigate, onImport }: { onNavigate: (p: Page)=>void; onImport: ()=>void }) {
+function Dashboard({
+  games,
+  onNavigate,
+  onImport,
+  onOpenAnalysis
+}: {
+  games: GameRecord[];
+  onNavigate: (p: Page) => void;
+  onImport: () => void;
+  onOpenAnalysis: (g: GameRecord) => void;
+}) {
+  const recentGames = games.slice(0, 3);
   return <div className="content dashboard-content">
     <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={13}/> YOUR TRAINING DESK</div><h1>Good afternoon.</h1><p className="subheading">A clearer picture of your chess. One decision at a time.</p></div><div className="date-chip"><CalendarClock size={14}/> Tuesday, 3 November 2026</div></div>
     <div className="stat-grid">
       <StatCard label="CHESS.COM RAPID" value="1,205" change="Starting baseline" icon={<Gauge size={16}/>} tone="lime"/>
-      <StatCard label="GAMES ANALYSED" value="—" change="Import games to begin" icon={<Activity size={16}/>} />
+      <StatCard
+        label="GAMES IN LIBRARY"
+        value={games.length > 0 ? `${games.length}` : "—"}
+        change={games.length > 0 ? "Ready for review" : "Import games to begin"}
+        icon={<Activity size={16}/>}
+        tone={games.length > 0 ? "lime" : undefined}
+      />
       <StatCard label="REVIEW POSITIONS" value="—" change="No review data yet" icon={<Target size={16}/>} />
       <StatCard label="TRAINING STREAK" value="0 days" change="Your first session awaits" icon={<Flame size={16}/>} />
     </div>
@@ -275,7 +329,21 @@ function Dashboard({ onNavigate, onImport }: { onNavigate: (p: Page)=>void; onIm
       </section>
       <section className="panel focus-panel">
         <div className="panel-head"><div><div className="eyebrow">YOUR FOCUS</div><h2>What we know so far</h2></div><button className="icon-btn"><MoreHorizontal size={17}/></button></div>
-        <div className="empty-insight"><div className="insight-icon"><Brain size={19}/></div><strong>Your chess profile is waiting.</strong><p>Import 15–20 recent rapid games. ChessForge will look for recurring patterns before recommending what to study.</p><button className="text-button" onClick={onImport}>Import your first games <ArrowRight size={13}/></button></div>
+        {games.length >= 20 ? (
+          <div className="empty-insight">
+            <div className="insight-icon"><Brain size={19}/></div>
+            <strong>{games.length} games imported!</strong>
+            <p>Baseline sample met. In Phase 3, Stockfish engine analysis will evaluate these games to diagnose your recurring errors.</p>
+            <button className="text-button" onClick={()=>onNavigate("My Games")}>Explore your games <ArrowRight size={13}/></button>
+          </div>
+        ) : (
+          <div className="empty-insight">
+            <div className="insight-icon"><Brain size={19}/></div>
+            <strong>{games.length > 0 ? `${games.length} of 20 baseline games loaded` : "Your chess profile is waiting."}</strong>
+            <p>Import 15–20 recent rapid games. ChessForge will look for recurring patterns before recommending what to study.</p>
+            <button className="text-button" onClick={onImport}>{games.length > 0 ? "Import more games" : "Import your first games"} <ArrowRight size={13}/></button>
+          </div>
+        )}
         <div className="focus-footer"><ShieldCheck size={14}/> Recommendations will be based on your own games.</div>
       </section>
       <section className="panel performance-panel">
@@ -286,17 +354,52 @@ function Dashboard({ onNavigate, onImport }: { onNavigate: (p: Page)=>void; onIm
             <defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#b7e36a" stopOpacity=".18"/><stop offset="100%" stopColor="#b7e36a" stopOpacity="0"/></linearGradient></defs>
             {[15,55,95,135].map(y=><line key={y} x1="0" x2="620" y1={y} y2={y} stroke="#2a3941" strokeDasharray="3 5"/>)}
             <path d="M0 130 L620 130" stroke="#718087" strokeDasharray="4 5" fill="none"/>
-            <text x="310" y="78" fill="#829197" fontSize="12" textAnchor="middle">Import games to build your rating history</text>
+            <text x="310" y="78" fill="#829197" fontSize="12" textAnchor="middle">{games.length > 0 ? `${games.length} games recorded in library` : "Import games to build your rating history"}</text>
           </svg>
         </div>
         <div className="chart-legend"><span><i className="legend-dot lime"/> Chess.com Rapid</span><span><i className="legend-dot copper"/> Lichess Rapid</span><span className="chart-note">Platforms tracked separately</span></div>
       </section>
       <section className="panel activity-panel">
         <div className="panel-head"><div><div className="eyebrow">RECENT ACTIVITY</div><h2>Pick up where you left off</h2></div><button className="text-button" onClick={()=>onNavigate("My Games")}>View games <ArrowRight size={13}/></button></div>
-        <div className="empty-activity"><div className="empty-icon"><Database size={19}/></div><div><strong>No games in your library</strong><p>Your imported games and analysis reports will appear here.</p></div><button className="button button-secondary button-small" onClick={onImport}><Plus size={13}/> Add games</button></div>
+        {recentGames.length === 0 ? (
+          <div className="empty-activity"><div className="empty-icon"><Database size={19}/></div><div><strong>No games in your library</strong><p>Your imported games and analysis reports will appear here.</p></div><button className="button button-secondary button-small" onClick={onImport}><Plus size={13}/> Add games</button></div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+            {recentGames.map(g => (
+              <div
+                key={g.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  background: "var(--raised)",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  cursor: "pointer"
+                }}
+                onClick={() => onOpenAnalysis(g)}
+              >
+                <div>
+                  <strong>{g.white} vs {g.black}</strong>
+                  <div style={{ color: "var(--muted)", fontSize: "10px" }}>
+                    {g.result} · {g.time_class || g.platform} · {g.moves_count} moves
+                  </div>
+                </div>
+                <button className="button button-secondary button-small" onClick={e => { e.stopPropagation(); onOpenAnalysis(g); }}>
+                  Analyse
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
-    <div className="dashboard-bottom"><span><span className="status-dot"/> All systems ready</span><span>Sample workspace · No personal game data loaded</span><button onClick={()=>onNavigate("Analysis")}>Explore analysis workspace <ArrowRight size={13}/></button></div>
+    <div className="dashboard-bottom">
+      <span><span className="status-dot"/> All systems ready</span>
+      <span>{games.length > 0 ? `${games.length} games loaded in repository` : "Sample workspace · No personal game data loaded"}</span>
+      <button onClick={()=>onNavigate(games.length > 0 ? "My Games" : "Analysis")}>Explore library <ArrowRight size={13}/></button>
+    </div>
   </div>;
 }
 
@@ -373,21 +476,6 @@ function Placeholder({page,onImport,onNavigate}:{page:Page;onImport:()=>void;onN
   };
   const c=config[page]||config.Train; const Icon=c.icon;
   return <div className="content placeholder-page"><div className="placeholder-hero"><div className="placeholder-icon"><Icon size={24}/></div><div className="eyebrow">CHESSFORGE / {page.toUpperCase()}</div><h1>{c.title}</h1><p>{c.desc}</p><div className="placeholder-actions"><button className="button button-primary" onClick={page==="Train"||page==="Endgames"?()=>onNavigate("Analysis"):onImport}>{page==="Train"||page==="Endgames"?<Play size={14}/>:<Upload size={14}/>} {c.action}</button><button className="button button-secondary" onClick={()=>onNavigate("Dashboard")}>Back to dashboard</button></div></div><div className="placeholder-note"><ShieldCheck size={16}/><div><strong>Built around your own games</strong><p>We won't label a weakness until there is enough evidence from your imported games and training attempts.</p></div></div></div>;
-}
-
-function ImportDialog({onClose}:{onClose:()=>void}) {
-  const [tab,setTab]=useState("PGN file");
-  const [fileName,setFileName]=useState("");
-  return <div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <section className="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
-      <div className="modal-head"><div><div className="eyebrow">GAME LIBRARY</div><h2 id="import-title">Bring your games into ChessForge</h2><p>Start with PGN files. Platform sync can be connected after the core workflow.</p></div><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={17}/></button></div>
-      <div className="import-tabs">{["PGN file","Paste PGN","Chess.com","Lichess"].map(t=><button key={t} className={tab===t?"selected":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
-      {tab==="PGN file" ? <label className="upload-zone"><input type="file" accept=".pgn,.txt" onChange={e=>setFileName(e.target.files?.[0]?.name||"")}/><div className="upload-icon"><CloudDownload size={21}/></div><strong>{fileName||"Choose a PGN file"}</strong><span>{fileName?"File selected · Import processing will be added next":"Drag a file here or browse your computer"}</span><small>PGN format · Multiple games supported in the planned importer</small></label> :
-      tab==="Paste PGN" ? <textarea className="pgn-textarea" placeholder={'[Event "Casual Game"]\\n[White "Player"]\\n[Black "Opponent"]\\n\\n1. e4 e5 2. Nf3 Nc6'} /> :
-      <div className="platform-connect"><div className="platform-mark">{tab==="Chess.com"?"C":"♞"}</div><strong>Connect your {tab} profile</strong><p>Public game import will use your username. You can also continue using manual PGN uploads.</p><input placeholder={`${tab} username`} /><span className="helper-text">Account synchronisation is planned; this control is a preview.</span></div>}
-      <div className="modal-footer"><span><ShieldCheck size={13}/> Your imported games remain yours.</span><button className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" onClick={onClose} disabled={!fileName && tab==="PGN file"}>Continue <ArrowRight size={14}/></button></div>
-    </section>
-  </div>;
 }
 
 export default App;

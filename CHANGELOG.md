@@ -11,8 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Current Status
-- **Active Phase:** Phase 1 Complete · Ready to enter Phase 2 (Import & Library)
-- **Gate Status:** Complete. All Phase 1 deliverables, unit tests, e2e smoke tests, CI workflow, and documentation verified. Tag `v0.1.0` cut.
+- **Active Phase:** Phase 2 (Import & Game Library)
+- **Gate Status:** Feature-complete. Migration, client-side PGN parser, SHA-256 fingerprint deduplication, interactive Import dialog, and Game Library view implemented and verified with 16 unit tests and 2 E2E tests.
+
+### Added
+- **Database migration** `supabase/migrations/20261103000001_create_games_and_platform_accounts.sql`:
+  - `platform_accounts` table with unique constraint on `(user_id, platform, username)` and strict RLS policies.
+  - `games` table with unique constraint on `(user_id, fingerprint)`, partial index for `(user_id, platform, external_id)`, and performance indexes on `played_at`, `platform`, and `fingerprint`.
+  - Strict RLS policies ensuring users can only read and write their own rows.
+- **Pure TypeScript PGN Parser** `src/lib/pgn-parser.ts`:
+  - Multi-game streaming and splitting supporting archives up to 5 MB.
+  - Seven Tag Roster (STR) + supplementary header parsing (`Event`, `Site`, `Date`, `Round`, `White`, `Black`, `Result`, `WhiteElo`, `BlackElo`, `TimeControl`, `Termination`, `SetUp`, `FEN`, `Variant`).
+  - Move validation via `chess.js` verifying legal moves and starting FEN positions.
+  - Error isolation: malformed games produce descriptive error reports without blocking valid games in the same file.
+  - Time control categorization (`categorizeTimeControl`) into UltraBullet, Bullet, Blitz, Rapid, Classical, and Daily.
+  - Canonical SHA-256 fingerprint calculation (`computeGameFingerprint`) based on normalized movetext, players, and date.
+  - User color detection based on profile username or email.
+- **Games Service** `src/lib/games.ts`:
+  - `getGames(userId)` querying Supabase with automatic local storage fallback for unauthenticated / local sessions.
+  - `saveParsedGames(parsedGames, source, userId)` with batch deduplication against existing fingerprints.
+  - `deleteGame(gameId, userId)` with database and local storage synchronization.
+- **Interactive Import Dialog** `src/components/ImportDialog.tsx`:
+  - Drag-and-drop file upload supporting `.pgn` and `.txt` files up to 5 MB.
+  - Direct PGN text paste tab.
+  - Live import report with breakdown of games imported, duplicates skipped, and malformed games with line snippets and reasons.
+  - Immediate library refresh callback and navigation shortcut.
+- **Game Library Workspace** `src/components/GameLibrary.tsx`:
+  - Replaces "My Games" placeholder with a responsive game list.
+  - Opponent name, Elo ratings, user color badge, and result pill (Win/Loss/Draw).
+  - Time control and platform metadata chips.
+  - Search by opponent/player name.
+  - Filtering by platform, color, result, and speed/time class.
+  - Sorting by date played (newest/oldest).
+  - One-click "Analyse" action that loads the complete game into the Analysis board workspace.
+  - Game deletion action with confirmation.
+- **Dashboard Integration** (`src/App.tsx`):
+  - "GAMES IN LIBRARY" stat card updates with live game count.
+  - "RECENT ACTIVITY" shows recent games with direct "Analyse" shortcuts.
+  - "YOUR FOCUS" provides feedback on progress towards the 20-game baseline needed for engine analysis.
+- **Architecture Decision Record** `docs/decisions/0008-pgn-parser-and-fingerprinting.md`.
+- **Unit Test Suite** `tests/unit/pgn-parser.test.ts`:
+  - 7 tests covering single game parsing, multi-game files, malformed game isolation, fingerprint determinism, time control classification, color detection, and date parsing. All 16 unit tests passing.
+- **Playwright E2E Integration Test** `tests/e2e/smoke.spec.ts`:
+  - End-to-end test verifying PGN import, duplicate detection, library browsing, and opening a game in the analysis workspace. All 2 E2E tests passing.
 
 ---
 
@@ -77,14 +118,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [x] Initialize `docs/licences.md` and ADRs `0001`–`0007`.
 - [x] CI pipeline (`.github/workflows/ci.yml`) — typecheck, unit tests, and Playwright e2e smoke tests on push/PR.
 - [x] Playwright end-to-end smoke test (`tests/e2e/smoke.spec.ts`).
-- [ ] Tag `v0.1.0` once phase sign-off confirmed.
+- [x] Tag `v0.1.0` cut and pushed to GitHub.
 
 ### Phase 2: Import & Library (Target: v0.2.0)
-- [ ] Implement pure TypeScript PGN parser with fixture test suite in `packages/chess-core`.
-- [ ] Implement SHA-256 game fingerprint deduplication.
-- [ ] Add `games` and `platform_accounts` Supabase tables with RLS and user ownership.
-- [ ] Build drag-and-drop file upload, PGN text paste dialog, and malformed game reporting.
-- [ ] Build game library view with platform, color, result, and time control filters.
+- [x] Implement pure TypeScript PGN parser with fixture test suite (`src/lib/pgn-parser.ts`, `tests/unit/pgn-parser.test.ts`).
+- [x] Implement SHA-256 game fingerprint deduplication (`computeGameFingerprint`).
+- [x] Add `games` and `platform_accounts` Supabase tables with RLS and user ownership (`supabase/migrations/20261103000001_create_games_and_platform_accounts.sql`).
+- [x] Build drag-and-drop file upload, PGN text paste dialog, and malformed game reporting (`src/components/ImportDialog.tsx`).
+- [x] Build game library view with platform, color, result, and time control filters (`src/components/GameLibrary.tsx`).
+- [ ] Import real 40-game benchmark dataset and sign off Phase 2 exit criteria.
 
 ### Phase 3: Engine Analysis (Target: v0.3.0)
 - [ ] Implement `Engine` interface and UCI parser in `packages/engine`.
