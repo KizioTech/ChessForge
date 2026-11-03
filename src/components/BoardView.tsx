@@ -83,6 +83,18 @@ export function BoardView({
         animation: {
           enabled: true,
           duration: 180
+        },
+        drawable: {
+          enabled: true,         // allow user drawings
+          visible: true,
+          defaultSnapToValidMove: true,
+          eraseOnClick: true,    // left-click clears all shapes
+          brushes: {
+            green:  { key: "g", color: "#15781B", opacity: 0.8, lineWidth: 10 },
+            red:    { key: "r", color: "#882020", opacity: 0.8, lineWidth: 10 },
+            blue:   { key: "b", color: "#003088", opacity: 0.8, lineWidth: 10 },
+            yellow: { key: "y", color: "#e68f00", opacity: 0.8, lineWidth: 10 },
+          }
         }
       });
     } else {
