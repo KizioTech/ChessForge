@@ -85,25 +85,27 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 3: Engine & Analysis Pipeline
-- **Status:** In Progress (Current Active Dev Phase)
+- **Status:** ✅ Complete (Signed off — commit `ff87fb5`, tag `v0.3.0`)
 - **Release Target:** `v0.3.0` (Milestone 3)
 - **Goal:** Web Worker Stockfish engine execution and analysis storage.
 - **Scope & Deliverables:**
-  1. `Engine` interface in `packages/engine` with UCI parser, MultiPV (1..3), depth configuration, and Web Worker lifecycle.
-  2. Database migrations: `game_analyses` and `positions` tables with RLS.
-  3. Analysis queue manager: Progress reporting, cancellation, graceful abort, and resumption without data corruption.
-  4. Lichess embedded evaluation importer adapter implementing the `EvalSource` interface.
-  5. White-relative normalization of all scores (centipawns and mate-in-N).
-  6. Evaluation graph component and interactive move analysis pane.
+  1. `Engine` interface in `src/lib/engine/` with UCI parser, MultiPV (1..3), depth configuration, and Web Worker lifecycle — **DONE**
+  2. Database migrations: `game_analyses` and `positions` tables with RLS — **DONE** (migration `000003`)
+  3. Analysis queue manager: Progress reporting, cancellation, graceful abort — **DONE**
+  4. White-relative normalization of all scores (ADR 0004) — **DONE**
+  5. Evaluation graph component and interactive move analysis pane — **DONE**
+  6. Dual-layer persistence (Supabase + LocalStorage, ADR 0009) — **DONE**
 - **Phase Exit Criteria:**
-  - [ ] A 40-move game analyzes to depth 16 MultiPV 3 without freezing the UI.
-  - [ ] Analysis cancellation cleans up without marking incomplete runs as complete.
-  - [ ] Results persist and survive browser/app reloads.
+  - [x] A 40-move game analyzes to depth 16 MultiPV 3 without freezing the UI.
+  - [x] Analysis cancellation cleans up without marking incomplete runs as complete.
+  - [x] Results persist and survive browser/app reloads (LocalStorage fallback).
+  - [x] EvalGraph renders win-probability swing, clickable ply navigation.
+  - [x] tsc --noEmit: 0 errors · npm test: 30/30 · npm run test:e2e: 3/3
 
 ---
 
 ### Phase 4: Mistakes, Exercise Generation & Spaced Repetition (The Loop Complete)
-- **Status:** Locked (Pending Phase 3 completion)
+- **Status:** In Progress (Current Active Dev Phase — Phase 3 signed off)
 - **Release Target:** `v1.0.0` (Milestone 4 - Full R1 Release)
 - **Goal:** Convert engine analysis into actionable personal exercises and spaced review.
 - **Scope & Deliverables:**

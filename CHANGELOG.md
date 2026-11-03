@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Current Status
-- **Active Phase:** Phase 3 (Engine & Analysis Pipeline)
-- **Gate Status:** In progress — engine pipeline, UCI parser, EvalGraph, MultiPV UI, analysis persistence implemented. Awaiting final E2E verification.
+- **Active Phase:** Phase 4 (Mistakes, Exercise Generation & Spaced Repetition)
+- **Gate Status:** Phase 3 signed off at `v0.3.0` (commit `ff87fb5`). Phase 4 now active.
+
+---
+
+## [0.3.0] - 2026-11-03
 
 ### Added (Phase 3 — unreleased)
 - **Stockfish 19 WASM Engine Integration**:
