@@ -12,7 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 1 (Foundation & Application Shell)
-- **Gate Status:** Near-complete. All core functionality implemented and verified: auth, interactive board, CI pipeline, ADRs, tests, and license registry. Awaiting Playwright e2e smoke test before phase gate closes.
+- **Gate Status:** Near-complete. Auth context, board, CI, ADRs, and tests all in place. Awaiting Playwright e2e smoke test.
+
+### Added
+- **`src/lib/AuthContext.tsx`** — React context provider (`AuthProvider`) that owns a single global `onAuthStateChange` listener. All components that call `useAuth()` share one session, one user object, and one profile — no duplicated listeners or stale state after sign-in / sign-out.
+- **`src/main.tsx`** — wrapped `<App />` in `<AuthProvider>` so the context is available throughout the tree.
+- **`src/lib/auth.ts`** — simplified to a re-export barrel (`useAuth`, `AuthProvider`, `OAUTH_CALLBACK_URL`, `AuthState`) for backward-compatible imports.
+
+### Fixed
+- **UI not reflecting logged-in state after sign-in** — root cause: `App.tsx` and `AuthModal.tsx` each called `useAuth()`, creating two independent hook instances with separate React state. When `signInWithPassword` resolved and `onAuthStateChange` fired, the `App` instance could miss or lag the update. Fixed by lifting all auth state into a single `AuthContext` — one listener, one source of truth, all subscribers update atomically.
 
 ### Added
 - **CI pipeline** `.github/workflows/ci.yml` — runs TypeScript typecheck and Vitest unit tests on every push and pull request to `main`. Uses Node 22, `npm ci`, and concurrency cancellation for stale runs.
