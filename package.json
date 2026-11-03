@@ -13,7 +13,7 @@
     "test:e2e": "npm run build && playwright test",
     "start": "electron .",
     "preview": "vite preview",
-    "postinstall": "node -e \"const fs=require('fs');const path=require('path');const src=path.join('node_modules','stockfish','bin','stockfish-19-lite-single');['js','.wasm'].forEach(ext=>{ try{fs.mkdirSync('public',{recursive:true});fs.copyFileSync(src+(ext==='.wasm'?ext:''+ext),path.join('public','stockfish'+(ext==='.wasm'?'-19-lite-single.wasm':'.js')))}catch(e){} });\""
+    "postinstall": "node -e \"const fs=require('fs');const path=require('path');const bin=path.join('node_modules','stockfish','bin');try{fs.mkdirSync('public',{recursive:true});fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.js'),path.join('public','stockfish.js'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish.wasm'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish-19-lite-single.wasm'));}catch(e){}\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

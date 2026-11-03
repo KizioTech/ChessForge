@@ -56,3 +56,4 @@ export function exportAllDataAsJson(games: GameRecord[]): string {
 
   return JSON.stringify(backup, null, 2);
 }
+

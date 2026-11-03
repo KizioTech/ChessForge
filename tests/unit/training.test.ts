@@ -423,3 +423,4 @@ describe("Data Export Sovereignty (FR-112)", () => {
     expect(Array.isArray(parsed.schedule)).toBe(true);
   });
 });
+

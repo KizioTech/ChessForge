@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
 - **Gate Status:** Phase 4 completed and signed off at `v1.0.0` (Release 1 - The Loop Complete).
 
+### Fixed & Improved
+- **Live Analysis Engine & MultiPV 3 Continuation Lines**:
+  - Fixed Stockfish 16 WASM binary resolution by bundling `public/stockfish.wasm` alongside `public/stockfish-19-lite-single.wasm`.
+  - Configured `StockfishEngine.init()` to wait for `readyok` before dispatching UCI evaluation requests.
+  - Integrated continuous live position evaluation in `Analysis` view: calculates evaluation and top 3 candidate moves (MultiPV 3) at depth 12 whenever moves are played or browsed.
+  - Added `pvToSan()` in `src/lib/engine/uci-parser.ts` to convert UCI Principal Variation moves into readable Standard Algebraic Notation (`pvSan`).
+  - Enhanced candidate line UI in `src/App.tsx` and `src/styles-phase3.css` to render interactive cards displaying rank badge, suggested SAN move, eval score (+0.xx / M#), and multi-move continuation sequence. Clicking a candidate move applies it directly to the board.
+  - Normalized `PositionEvaluation` vs `PositionRecord` union accessors in `src/App.tsx` (`scoreCp`, `mateIn`, `candidateLines`), fixing TS2339 build errors.
+  - Updated E2E smoke tests in `tests/e2e/smoke.spec.ts` to verify live engine badge states (`Online` / `Calculating`). All 43 unit tests and 4 E2E tests passing.
+
 ---
 
 ## [1.0.0] - 2026-11-03

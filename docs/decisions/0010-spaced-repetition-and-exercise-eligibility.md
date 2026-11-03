@@ -67,3 +67,4 @@ Users retain 100% data sovereignty:
 - **Positive:** Strict eligibility rules eliminate low-quality puzzle generation from complex engine lines.
 - **Positive:** Offline and unauthenticated guests can train smoothly via LocalStorage mirroring.
 - **Traceability:** Full attempt history allows future statistical weakness modeling (Phase 5).
+

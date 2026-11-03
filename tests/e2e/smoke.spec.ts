@@ -156,9 +156,9 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
     await expect(analyseBtn).toBeVisible();
     await expect(analyseBtn).toBeDisabled();
 
-    // Engine evaluation panel should show offline state
+    // Engine evaluation panel should be visible with live engine running
     await expect(page.locator(".evaluation-panel")).toBeVisible();
-    await expect(page.locator(".engine-badge")).toContainText("Offline");
+    await expect(page.locator(".engine-badge")).toContainText(/Online|Calculating/);
 
     // Now import a game and open it for analysis
     const importBtn = page.getByRole("button", { name: "Import games" }).first();

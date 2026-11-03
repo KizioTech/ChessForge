@@ -373,3 +373,4 @@ export function getTrainingStats(userId?: string): TrainingStats {
     blundersPer100Moves
   };
 }
+

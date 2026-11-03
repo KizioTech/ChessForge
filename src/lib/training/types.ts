@@ -99,3 +99,4 @@ export interface TrainingSessionRecord {
 export interface ExerciseWithSchedule extends TrainingExerciseRecord {
   schedule?: ReviewScheduleRecord;
 }
+

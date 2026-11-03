@@ -71,18 +71,41 @@
 
 .candidate-line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: 5px;
   background: var(--raised);
   font-size: 11px;
   font-family: var(--mono);
   transition: background 0.15s;
+  cursor: pointer;
 }
 
 .candidate-line:hover {
   background: var(--hover);
+}
+
+.candidate-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.candidate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.candidate-continuation {
+  font-size: 10px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rank-badge {
@@ -91,21 +114,19 @@
   font-weight: 700;
   min-width: 16px;
   text-align: center;
+  margin-top: 1px;
 }
 
 .candidate-san {
-  flex: 1;
   color: var(--fg);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .candidate-score {
   font-size: 10px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--lime);
   min-width: 40px;
   text-align: right;
 }

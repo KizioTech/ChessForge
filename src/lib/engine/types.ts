@@ -21,6 +21,7 @@ export interface CandidateLine {
   uci: string; // e.g. "e2e4"
   san?: string; // e.g. "e4"
   pv: string[]; // sequence of UCI moves in this variation
+  pvSan?: string; // formatted sequence of SAN moves, e.g. "e4 e5 Nf3 Nc6"
 }
 
 export interface PositionEvaluation {

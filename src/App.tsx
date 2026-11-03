@@ -22,7 +22,8 @@ import { useAuth } from "./lib/auth";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
 import { getAnalysisForGame } from "./lib/analyses";
 import { analyzeGame, computeMoveClassifications } from "./lib/engine/game-analyzer";
-import type { PositionRecord, MoveAnalysisReport } from "./lib/engine/types";
+import { StockfishEngine } from "./lib/engine/stockfish-engine";
+import type { PositionEvaluation, PositionRecord, MoveAnalysisReport } from "./lib/engine/types";
 import { generateExercisesFromGame } from "./lib/training/exercise-generator";
 import {
   saveGeneratedExercises,
@@ -169,7 +170,7 @@ function App() {
       setPage("Analysis");
     }
     // Load cached analysis if available (non-blocking)
-    getAnalysisForGame(gameRecord.id, undefined).then(({ positions }) => {
+    getAnalysisForGame(gameRecord.id, user?.id).then(({ positions }) => {
       if (positions.length > 0) {
         setAnalysisPositions(positions);
         setMoveReports(computeMoveClassifications(positions));
@@ -191,14 +192,42 @@ function App() {
   }
 
   async function handleAnalyzeGame() {
-    if (!activeGame || isAnalyzing) return;
+    if (isAnalyzing) return;
+
+    let targetGame = activeGame;
+    if (!targetGame) {
+      if (moves.length === 0) return;
+      const now = new Date().toISOString();
+      targetGame = {
+        id: `free-${Date.now()}`,
+        user_id: user?.id,
+        platform: "local",
+        fingerprint: `free-${moves.join("")}`,
+        pgn: game.pgn() || moves.join(" "),
+        white: "White",
+        black: "Black",
+        user_colour: "unknown",
+        result: game.isCheckmate() ? (game.turn() === "w" ? "0-1" : "1-0") : "*",
+        moves_count: moves.length,
+        rated: false,
+        variant: "standard",
+        source: "upload",
+        created_at: now,
+        updated_at: now
+      };
+      setActiveGame(targetGame);
+    }
+
+    if (!targetGame) return;
+
+    const gameToAnalyze = targetGame;
     const controller = new AbortController();
     setAnalysisAbortController(controller);
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     try {
-      const result = await analyzeGame(activeGame, {
-        depth: 16,
+      const result = await analyzeGame(gameToAnalyze, {
+        depth: 12,
         multiPv: 3,
         signal: controller.signal,
         onProgress: p => setAnalysisProgress(p.percent)
@@ -210,10 +239,10 @@ function App() {
       // Phase 4: Automatically generate training exercises and mistakes from analysis
       try {
         const generated = generateExercisesFromGame({
-          game: activeGame,
+          game: gameToAnalyze,
           positions: result.positions,
           reports: classifications,
-          userColour: activeGame.user_colour === "black" ? "black" : "white"
+          userColour: gameToAnalyze.user_colour === "black" ? "black" : "white"
         });
         if (generated.exercises.length > 0 || generated.mistakes.length > 0) {
           await saveGeneratedExercises(generated.mistakes, generated.exercises, user?.id);
@@ -391,6 +420,7 @@ function App() {
             analysisProgress={analysisProgress}
             onAnalyzeGame={handleAnalyzeGame}
             onCancelAnalysis={() => analysisAbortController?.abort()}
+            hasMoves={moves.length > 0}
           />
         )}
         {page === "Train" && (
@@ -568,7 +598,8 @@ function Analysis({
   isAnalyzing,
   analysisProgress,
   onAnalyzeGame,
-  onCancelAnalysis
+  onCancelAnalysis,
+  hasMoves = false
 }: {
   game: Chess;
   onMove: (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => void;
@@ -587,33 +618,95 @@ function Analysis({
   analysisProgress: number;
   onAnalyzeGame: () => void;
   onCancelAnalysis: () => void;
+  hasMoves?: boolean;
 }) {
+  const [liveEval, setLiveEval] = useState<PositionEvaluation | null>(null);
+  const [isLiveCalculating, setIsLiveCalculating] = useState(false);
+  const [engineEnabled, setEngineEnabled] = useState(true);
+
   // Build report lookup by ply for badge rendering
   const reportByPly = useMemo(
     () => Object.fromEntries(moveReports.map(r => [r.ply, r])),
     [moveReports]
   );
 
-  // Current ply evaluation
-  const currentEval = analysisPositions.length > 0
-    ? analysisPositions.find(p => p.ply === historyIndex) ?? analysisPositions[historyIndex] ?? null
+  // Look up pre-computed evaluation for current ply
+  const cachedEval = useMemo(() => {
+    if (analysisPositions.length === 0) return null;
+    return analysisPositions.find(p => p.ply === historyIndex) ?? analysisPositions[historyIndex] ?? null;
+  }, [analysisPositions, historyIndex]);
+
+  // Live Stockfish evaluation for current position on board
+  useEffect(() => {
+    if (!engineEnabled) {
+      setLiveEval(null);
+      setIsLiveCalculating(false);
+      return;
+    }
+
+    if (cachedEval) {
+      setLiveEval(cachedEval as unknown as PositionEvaluation);
+      setIsLiveCalculating(false);
+      return;
+    }
+
+    const fen = game.fen();
+    const controller = new AbortController();
+    setIsLiveCalculating(true);
+
+    const liveEngine = new StockfishEngine({ depth: 12, multiPv: 3 });
+    liveEngine.evaluatePosition(fen, {
+      depth: 12,
+      multiPv: 3,
+      signal: controller.signal,
+      ply: historyIndex
+    }).then(result => {
+      setLiveEval(result);
+      setIsLiveCalculating(false);
+    }).catch(err => {
+      if ((err as DOMException).name !== "AbortError") {
+        console.warn("Live evaluation:", err);
+      }
+      setIsLiveCalculating(false);
+    });
+
+    return () => {
+      controller.abort();
+      liveEngine.dispose();
+    };
+  }, [game, historyIndex, cachedEval, engineEnabled]);
+
+  const currentEval = cachedEval || liveEval;
+
+  const mateIn = currentEval
+    ? ("mateIn" in currentEval ? currentEval.mateIn : (currentEval as any).mate_in)
+    : null;
+
+  const scoreCp = currentEval
+    ? ("scoreCp" in currentEval ? currentEval.scoreCp : (currentEval as any).score_cp)
     : null;
 
   // Derive an eval-rail value from current position evaluation (centipawns → ±N)
-  const evalValue = currentEval
-    ? currentEval.mate_in !== null
-      ? (currentEval.mate_in > 0 ? 5 : -5)
-      : (currentEval.score_cp ?? 0) / 100
-    : 0;
+  const evalValue = mateIn !== null && mateIn !== undefined
+    ? (mateIn > 0 ? 5 : -5)
+    : (scoreCp ?? 0) / 100;
 
-  const evalLabel = currentEval
-    ? currentEval.mate_in !== null
-      ? `M${Math.abs(currentEval.mate_in)}`
-      : `${currentEval.score_cp && currentEval.score_cp > 0 ? "+" : ""}${((currentEval.score_cp ?? 0) / 100).toFixed(2)}`
-    : "—";
+  const evalLabel = mateIn !== null && mateIn !== undefined
+    ? `M${Math.abs(mateIn)}`
+    : scoreCp !== null && scoreCp !== undefined
+      ? `${scoreCp > 0 ? "+" : ""}${(scoreCp / 100).toFixed(2)}`
+      : isLiveCalculating ? "…" : "0.00";
 
   const isCheckmatePosition = game.isCheckmate();
   const isCheckPosition = game.inCheck() && !game.isCheckmate();
+
+  // MultiPV candidate lines to display
+  const candidateLines = useMemo(() => {
+    if (!currentEval) return [];
+    if ("lines" in currentEval && Array.isArray((currentEval as any).lines)) return (currentEval as any).lines;
+    if ("pv_lines" in currentEval && Array.isArray((currentEval as any).pv_lines)) return (currentEval as any).pv_lines;
+    return [];
+  }, [currentEval]);
 
   return <div className="content analysis-content">
     <div className="analysis-heading">
@@ -645,7 +738,14 @@ function Analysis({
             <Plus size={14}/> New board
           </button>
         )}
-        <button className="button button-secondary"><MoreHorizontal size={15}/> Options</button>
+        <button
+          className="button button-secondary"
+          onClick={() => setEngineEnabled(!engineEnabled)}
+          title={engineEnabled ? "Disable live evaluation" : "Enable live evaluation"}
+        >
+          <Zap size={14} style={{ color: engineEnabled ? "var(--lime)" : "var(--muted)" }}/>
+          {engineEnabled ? "Engine ON" : "Engine OFF"}
+        </button>
         {isAnalyzing ? (
           <button className="button button-secondary analysis-cancel-btn" onClick={onCancelAnalysis}>
             <X size={14}/> Cancel ({analysisProgress}%)
@@ -654,8 +754,8 @@ function Analysis({
           <button
             className="button button-primary"
             onClick={onAnalyzeGame}
-            disabled={!activeGame}
-            title={!activeGame ? "Load a game from your library to analyse it" : undefined}
+            disabled={!activeGame && !hasMoves}
+            title={!activeGame && !hasMoves ? "Make moves on the board or load a game to analyse" : undefined}
           >
             <Sparkles size={14}/> {analysisPositions.length > 0 ? "Re-analyse" : "Analyse game"}
           </button>
@@ -770,51 +870,66 @@ function Analysis({
         <section className="panel evaluation-panel">
           <div className="panel-head">
             <div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div>
-            {currentEval ? (
-              <span className="engine-badge"><span className="status-live"/> SF16</span>
+            {engineEnabled ? (
+              <span className="engine-badge" onClick={() => setEngineEnabled(false)} title="Click to pause engine" style={{ cursor: "pointer" }}>
+                <span className="status-live"/> {isLiveCalculating ? "Calculating…" : "SF16 · Online"}
+              </span>
             ) : (
-              <span className="engine-badge"><span className="status-muted"/> Offline</span>
+              <span className="engine-badge" onClick={() => setEngineEnabled(true)} title="Click to resume engine" style={{ cursor: "pointer" }}>
+                <span className="status-muted"/> Offline (Paused)
+              </span>
             )}
           </div>
-          {currentEval ? (
-            <>
-              <div className="eval-main">
-                <span className="eval-score">{evalLabel}</span>
-                <span className="eval-caption">
-                  {currentEval.mate_in !== null
-                    ? `Forced mate in ${Math.abs(currentEval.mate_in)}`
-                    : evalValue > 1 ? "White is better" : evalValue < -1 ? "Black is better" : "Roughly equal"}
-                </span>
-              </div>
-              {/* MultiPV candidate lines */}
-              {currentEval.pv_lines && currentEval.pv_lines.length > 0 && (
-                <div className="candidate-lines">
-                  {currentEval.pv_lines.map((line: any) => (
-                    <div key={line.rank} className="candidate-line">
-                      <span className="rank-badge">{line.rank === 1 ? "★" : `${line.rank}.`}</span>
-                      <span className="candidate-san">{line.san || line.uci || "—"}</span>
-                      <span className="candidate-score">
-                        {line.mateIn !== null
-                          ? `M${Math.abs(line.mateIn)}`
-                          : `${line.scoreCp && line.scoreCp > 0 ? "+" : ""}${((line.scoreCp ?? 0) / 100).toFixed(2)}`}
-                      </span>
+
+          <div className="eval-main">
+            <span className="eval-score">{evalLabel}</span>
+            <span className="eval-caption">
+              {mateIn !== null && mateIn !== undefined
+                ? `Forced mate in ${Math.abs(mateIn)}`
+                : evalValue > 1 ? "White is better" : evalValue < -1 ? "Black is better" : "Roughly equal"}
+            </span>
+          </div>
+
+          {/* MultiPV candidate lines */}
+          {candidateLines.length > 0 && (
+            <div className="candidate-lines">
+              {candidateLines.map((line: any) => {
+                const lineMate = line.mateIn ?? line.mate_in ?? null;
+                const lineCp = line.scoreCp ?? line.score_cp ?? 0;
+                return (
+                  <div
+                    key={line.rank}
+                    className="candidate-line"
+                    onClick={() => {
+                      if (line.uci && line.uci.length >= 4) {
+                        onMove(line.uci.slice(0, 2) as Square, line.uci.slice(2, 4) as Square, line.uci[4] as any);
+                      }
+                    }}
+                    title="Click to play this move on board"
+                  >
+                    <span className="rank-badge">{line.rank === 1 ? "★" : `${line.rank}.`}</span>
+                    <div className="candidate-body">
+                      <div className="candidate-header">
+                        <strong className="candidate-san">{line.san || line.uci || "—"}</strong>
+                        <span className="candidate-score">
+                          {lineMate !== null && lineMate !== undefined
+                            ? `M${Math.abs(lineMate)}`
+                            : `${lineCp > 0 ? "+" : ""}${(lineCp / 100).toFixed(2)}`}
+                        </span>
+                      </div>
+                      {line.pvSan && <span className="candidate-continuation">{line.pvSan}</span>}
                     </div>
-                  ))}
-                </div>
-              )}
-              <div className="engine-settings">
-                <span>Depth <b>16</b></span>
-                <span>MultiPV <b>3</b></span>
-                <span>Engine <b>Stockfish 16</b></span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="eval-main"><span className="eval-score">—</span><span className="eval-caption">{isAnalyzing ? "Calculating…" : "Run analysis to see evaluation"}</span></div>
-              <div className="engine-placeholder"><Zap size={15}/><span>{isAnalyzing ? `Analysis in progress… ${analysisProgress}%` : "Click \"Analyse game\" above to evaluate with Stockfish."}</span></div>
-              <div className="engine-settings"><span>Depth <b>—</b></span><span>MultiPV <b>—</b></span><span>Engine <b>Stockfish</b></span></div>
-            </>
+                  </div>
+                );
+              })}
+            </div>
           )}
+
+          <div className="engine-settings">
+            <span>Depth <b>12</b></span>
+            <span>MultiPV <b>3</b></span>
+            <span>Engine <b>Stockfish 16</b></span>
+          </div>
         </section>
 
         {/* Moves / Notation Panel */}

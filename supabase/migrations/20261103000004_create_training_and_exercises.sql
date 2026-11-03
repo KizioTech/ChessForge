@@ -141,3 +141,4 @@ create policy "Users manage own training sessions"
   to authenticated
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
+

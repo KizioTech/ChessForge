@@ -54,7 +54,7 @@ export class StockfishEngine implements Engine {
         this.sendCommand(`setoption name MultiPV value ${this.config.multiPv}`);
         this.sendCommand(`setoption name Hash value ${this.config.hashMb}`);
         this.sendCommand(`setoption name Threads value ${this.config.threads}`);
-        this.sendCommand("isready");
+        await this.isReady();
 
         this.isInitialized = true;
       } catch (err) {
@@ -72,7 +72,10 @@ export class StockfishEngine implements Engine {
     const worker = this.worker;
     return new Promise(resolve => {
       const listener = (e: MessageEvent) => {
-        if (typeof e.data === "string" && e.data.trim() === "readyok") {
+        if (
+          typeof e.data === "string" &&
+          (e.data.trim() === "readyok" || e.data.trim() === "uciok")
+        ) {
           worker.removeEventListener("message", listener);
           resolve(true);
         }
@@ -101,14 +104,59 @@ export class StockfishEngine implements Engine {
     const multiPv = options?.multiPv ?? this.config.multiPv;
     const ply = options?.ply ?? 0;
 
+    // Check for terminal positions (checkmate / stalemate)
+    try {
+      const chess = new Chess(fen);
+      if (chess.isGameOver()) {
+        return this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
+      }
+    } catch { /* proceed */ }
+
     // If no Web Worker, use deterministic heuristic engine (for tests / offline fallback)
     if (!this.worker) {
       return this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
     }
 
     return new Promise<PositionEvaluation>((resolve, reject) => {
-      this.currentResolver = resolve;
-      this.currentRejecter = reject;
+      let settled = false;
+
+      // Safety timeout: guarantees evaluation never hangs indefinitely
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          const fallback =
+            this.candidateLines.size > 0
+              ? buildPositionEvaluation(
+                  this.currentPly,
+                  this.currentFen,
+                  this.candidateLines,
+                  this.bestMoveUci || this.candidateLines.get(1)?.pv[0] || "",
+                  this.currentMoveSan,
+                  this.currentMoveUci
+                )
+              : this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
+          this.currentResolver = null;
+          this.currentRejecter = null;
+          resolve(fallback);
+        }
+      }, 6000);
+
+      this.currentResolver = (val: PositionEvaluation) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(val);
+        }
+      };
+
+      this.currentRejecter = (err: Error) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(err);
+        }
+      };
+
       this.candidateLines.clear();
       this.bestMoveUci = "";
       this.currentFen = fen;
@@ -119,14 +167,16 @@ export class StockfishEngine implements Engine {
       // Abort signal listener
       if (options?.signal) {
         const onAbort = () => {
-          this.sendCommand("stop");
-          reject(new DOMException("Evaluation aborted", "AbortError"));
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeoutId);
+            this.sendCommand("stop");
+            reject(new DOMException("Evaluation aborted", "AbortError"));
+          }
         };
         options.signal.addEventListener("abort", onAbort, { once: true });
       }
 
-      this.sendCommand("stop");
-      this.sendCommand(`setoption name MultiPV value ${multiPv}`);
       this.sendCommand(`position fen ${fen}`);
       this.sendCommand(`go depth ${depth}`);
     });
@@ -210,15 +260,15 @@ export class StockfishEngine implements Engine {
   }
 
   private createWorker(): Worker {
-    // If stockfish.js is available at public root /stockfish.js, load it
-    // Otherwise load in-browser worker
     try {
-      return new Worker("/stockfish.js");
+      const workerUrl = typeof window !== "undefined"
+        ? new URL("stockfish.js", window.location.href).href
+        : "/stockfish.js";
+      return new Worker(workerUrl);
     } catch {
-      // Fallback inline worker
+      // Fallback inline worker supporting MultiPV responses
       const workerBlob = new Blob([
         `
-        // Embedded lightweight UCI engine loop
         self.onmessage = function(e) {
           var cmd = e.data;
           if (cmd === 'uci') {
@@ -229,9 +279,11 @@ export class StockfishEngine implements Engine {
             postMessage('readyok');
           } else if (cmd.indexOf('go') === 0) {
             setTimeout(function() {
-              postMessage('info depth 16 seldepth 20 multipv 1 score cp 25 pv e2e4');
+              postMessage('info depth 12 multipv 1 score cp 25 pv e2e4 e7e5 g1f3 b8c6');
+              postMessage('info depth 12 multipv 2 score cp 12 pv d2d4 d7d5 c2c4 e7e6');
+              postMessage('info depth 12 multipv 3 score cp -5 pv g1f3 d7d5 g2g3 c7c5');
               postMessage('bestmove e2e4');
-            }, 50);
+            }, 60);
           }
         };
         `
@@ -291,14 +343,19 @@ export class StockfishEngine implements Engine {
     const bestMoveUci = bestMove ? `${bestMove.from}${bestMove.to}${bestMove.promotion || ""}` : "";
     const bestMoveSan = bestMove?.san || "";
 
-    const lines: CandidateLine[] = moves.slice(0, 3).map((m, idx) => ({
-      rank: idx + 1,
-      scoreCp,
-      mateIn,
-      uci: `${m.from}${m.to}${m.promotion || ""}`,
-      san: m.san,
-      pv: [`${m.from}${m.to}${m.promotion || ""}`]
-    }));
+    const lines: CandidateLine[] = moves.slice(0, 3).map((m, idx) => {
+      const lineScore = mateIn !== null ? mateIn : scoreCp - idx * 25;
+      const uci = `${m.from}${m.to}${m.promotion || ""}`;
+      return {
+        rank: idx + 1,
+        scoreCp: lineScore,
+        mateIn,
+        uci,
+        san: m.san,
+        pv: [uci],
+        pvSan: m.san
+      };
+    });
 
     const winProbability = calculateWinProbability(scoreCp, mateIn);
 

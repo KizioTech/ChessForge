@@ -91,6 +91,40 @@ export function uciToSan(fen: string, uciMove: string): string {
 }
 
 /**
+ * Replays a sequence of UCI moves on a FEN position to generate a readable SAN variation.
+ * Limits to maxMoves to keep displays clean.
+ */
+export function pvToSan(fen: string, pv: string[], maxMoves: number = 6): string {
+  if (!pv || pv.length === 0) return "";
+  try {
+    const chess = new Chess(fen);
+    const sans: string[] = [];
+    const limit = Math.min(pv.length, maxMoves);
+
+    for (let i = 0; i < limit; i++) {
+      const uci = pv[i];
+      if (!uci || uci.length < 4) break;
+      const from = uci.slice(0, 2);
+      const to = uci.slice(2, 4);
+      const promotion = uci.length > 4 ? uci[4].toLowerCase() : undefined;
+      const move = chess.move({
+        from,
+        to,
+        promotion: promotion as "q" | "r" | "b" | "n" | undefined
+      });
+      if (move) {
+        sans.push(move.san);
+      } else {
+        break;
+      }
+    }
+    return sans.join(" ");
+  } catch {
+    return pv.slice(0, maxMoves).join(" ");
+  }
+}
+
+/**
  * Builds a complete PositionEvaluation from accumulated UCI candidate lines and a bestmove string.
  */
 export function buildPositionEvaluation(
@@ -120,7 +154,8 @@ export function buildPositionEvaluation(
       mateIn: line.mateIn,
       uci: primaryUci,
       san: primaryUci ? uciToSan(fen, primaryUci) : undefined,
-      pv: line.pv
+      pv: line.pv,
+      pvSan: pvToSan(fen, line.pv)
     };
   });
 
