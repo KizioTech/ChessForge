@@ -13,7 +13,8 @@ import type {
   PositionEvaluation,
   MoveAnalysisReport,
   PositionRecord,
-  CandidateLine
+  CandidateLine,
+  Engine
 } from "./types";
 import { StockfishEngine } from "./stockfish-engine";
 import { getMoverWinProbability, classifyMove } from "./win-probability";
@@ -31,6 +32,7 @@ export interface AnalyzeGameOptions {
   multiPv?: number;
   signal?: AbortSignal;
   onProgress?: (progress: AnalysisProgress) => void;
+  engine?: Engine;
 }
 
 /**
@@ -81,7 +83,7 @@ export async function analyzeGame(
   }
 
   const totalPlies = plies.length;
-  const engine = new StockfishEngine({ depth, multiPv });
+  const engine = options?.engine ?? new StockfishEngine({ depth, multiPv });
   await engine.init();
 
   const evaluatedPositions: PositionEvaluation[] = [];
@@ -122,7 +124,7 @@ export async function analyzeGame(
     evaluatedPositions.map((pos, idx) => {
       return {
         game_id: game.id,
-        user_id: game.user_id ?? "",
+        user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
         ply: pos.ply,
         fen: pos.fen,
         move_san: pos.moveSan || null,
@@ -164,7 +166,9 @@ export function computeMoveClassifications(
   for (let i = 1; i < positions.length; i++) {
     const before = positions[i - 1];
     const after = positions[i];
-    const mover: "white" | "black" = i % 2 === 1 ? "white" : "black";
+    // Side to move is derived from the FEN of the position before the move
+    const sideChar = before.fen ? before.fen.split(" ")[1] : (i % 2 === 1 ? "w" : "b");
+    const mover: "white" | "black" = sideChar === "b" ? "black" : "white";
 
     const evalBefore = getMoverWinProbability(before.win_probability, mover);
     const evalAfter = getMoverWinProbability(after.win_probability, mover);

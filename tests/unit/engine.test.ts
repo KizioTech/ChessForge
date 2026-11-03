@@ -129,10 +129,12 @@ describe("Game Analyzer Pipeline & Move Classification", () => {
 
   it("analyzes a full game ply-by-ply reporting progress", async () => {
     const { analyzeGame } = await import("../../src/lib/engine/game-analyzer");
+    const { HeuristicEngine } = await import("../../src/lib/engine/heuristic-engine");
 
     const progressReports: number[] = [];
     const result = await analyzeGame(sampleGame, {
       depth: 12,
+      engine: new HeuristicEngine(),
       onProgress: p => progressReports.push(p.percent)
     });
 
@@ -181,5 +183,30 @@ describe("Game Analyzer Pipeline & Move Classification", () => {
     expect(reports[1].mover).toBe("black");
     expect(reports[1].loss).toBeGreaterThanOrEqual(20);
     expect(reports[1].classification).toBe("blunder");
+  });
+
+  it("classifies moves accurately when starting from a Black-to-move FEN", async () => {
+    const { computeMoveClassifications } = await import(
+      "../../src/lib/engine/game-analyzer"
+    );
+
+    // Position where Black is to move at ply 0
+    const blackToMoveFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const positions: any[] = [
+      { ply: 0, fen: blackToMoveFen, win_probability: 50.0, best_move_uci: "g8f6", best_move_san: "Nf6" },
+      { ply: 1, fen: "rnbqkb1r/pppp1ppp/5n2/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", win_probability: 50.0, move_uci: "g8f6", move_san: "Nf6" }
+    ];
+
+    const reports = computeMoveClassifications(positions);
+    expect(reports.length).toBe(1);
+    // Even though it is index 1, the mover was Black because ply 0 FEN has 'b'
+    expect(reports[0].mover).toBe("black");
+    expect(reports[0].classification).toBe("best");
+  });
+
+  it("StockfishEngine throws when Worker environment is missing (ADR 0004 safety)", async () => {
+    const { StockfishEngine } = await import("../../src/lib/engine/stockfish-engine");
+    const engine = new StockfishEngine();
+    await expect(engine.init()).rejects.toThrow(/Worker/i);
   });
 });

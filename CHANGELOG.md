@@ -14,15 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
 - **Gate Status:** Phase 4 completed and signed off at `v1.0.0` (Release 1 - The Loop Complete).
 
-### Fixed & Improved
-- **Live Analysis Engine & MultiPV 3 Continuation Lines**:
-  - Fixed Stockfish 16 WASM binary resolution by bundling `public/stockfish.wasm` alongside `public/stockfish-19-lite-single.wasm`.
-  - Configured `StockfishEngine.init()` to wait for `readyok` before dispatching UCI evaluation requests.
-  - Integrated continuous live position evaluation in `Analysis` view: calculates evaluation and top 3 candidate moves (MultiPV 3) at depth 12 whenever moves are played or browsed.
-  - Added `pvToSan()` in `src/lib/engine/uci-parser.ts` to convert UCI Principal Variation moves into readable Standard Algebraic Notation (`pvSan`).
-  - Enhanced candidate line UI in `src/App.tsx` and `src/styles-phase3.css` to render interactive cards displaying rank badge, suggested SAN move, eval score (+0.xx / M#), and multi-move continuation sequence. Clicking a candidate move applies it directly to the board.
-  - Normalized `PositionEvaluation` vs `PositionRecord` union accessors in `src/App.tsx` (`scoreCp`, `mateIn`, `candidateLines`), fixing TS2339 build errors.
-  - Updated E2E smoke tests in `tests/e2e/smoke.spec.ts` to verify live engine badge states (`Online` / `Calculating`). All 43 unit tests and 4 E2E tests passing.
+### Fixed & Hardened
+- **Engine Integrity & Error Handling**: Removed silent fallback fakes from `StockfishEngine`; initialization and timeouts now throw/reject to guarantee analysis veracity. Isolated test mock into `HeuristicEngine`.
+- **Exercise Generation Accuracy**: Solution scoring now calls `calculateWinProbability` (supporting mate evaluations accurately) and enforces the 10-point single-solution cutoff.
+- **Mistake Isolation**: Filtered out opponent mistakes to prevent stats and training queue pollution.
+- **FEN-Based Move Classification**: Side to move is now derived directly from FEN in `computeMoveClassifications`, supporting arbitrary starting positions.
+- **Engine Provenance**: Re-labelled engine version from `16-wasm` to `19-lite-wasm` (`Stockfish 19 Lite`).
+- **Security & Desktop Shell**: Added strict Content Security Policy (CSP) and favicon in `index.html`, added desktop app logo branding, and enabled `--allow-file-access-from-files` for packaged Electron worker execution.
+- **Documentation & Architecture Alignment**: Updated `CLAUDE.md`, `README.md`, and added ADR 0011 (Electron Desktop Runtime).
 
 ---
 

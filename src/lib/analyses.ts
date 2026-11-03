@@ -98,7 +98,7 @@ export async function saveAnalysis(
     game_id: analysisInput.game_id,
     user_id: analysisInput.user_id || "local-user",
     engine_name: analysisInput.engine_name || "Stockfish",
-    engine_version: analysisInput.engine_version || "16-wasm",
+    engine_version: analysisInput.engine_version || "19-lite-wasm",
     depth: analysisInput.depth || 16,
     multipv: analysisInput.multipv || 3,
     status: analysisInput.status || "completed",

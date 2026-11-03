@@ -342,7 +342,19 @@ function App() {
 
   return <div className="app-shell">
     <header className="titlebar">
-      <div className="titlebar-brand"><div className="brand-mark"><ChessKnight size={18}/></div><span>CHESSFORGE</span><span className="brand-divider">/</span><span className="titlebar-context">{page}</span></div>
+      <div className="titlebar-brand">
+        <img
+          src="/logo.png"
+          alt="ChessForge logo"
+          style={{ width: "20px", height: "20px", borderRadius: "4px", objectFit: "contain" }}
+          onError={(e) => {
+            (e.target as HTMLElement).style.display = "none";
+          }}
+        />
+        <span>CHESSFORGE</span>
+        <span className="brand-divider">/</span>
+        <span className="titlebar-context">{page}</span>
+      </div>
       <div className="titlebar-center"><span className="status-dot"/> Personal workspace <span className="titlebar-sep">·</span> {user ? user.email : "Local session"}</div>
       <div className="titlebar-actions">
         {user ? (
@@ -872,7 +884,7 @@ function Analysis({
             <div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div>
             {engineEnabled ? (
               <span className="engine-badge" onClick={() => setEngineEnabled(false)} title="Click to pause engine" style={{ cursor: "pointer" }}>
-                <span className="status-live"/> {isLiveCalculating ? "Calculating…" : "SF16 · Online"}
+                <span className="status-live"/> {isLiveCalculating ? "Calculating…" : "SF19 · Online"}
               </span>
             ) : (
               <span className="engine-badge" onClick={() => setEngineEnabled(true)} title="Click to resume engine" style={{ cursor: "pointer" }}>
@@ -928,7 +940,7 @@ function Analysis({
           <div className="engine-settings">
             <span>Depth <b>12</b></span>
             <span>MultiPV <b>3</b></span>
-            <span>Engine <b>Stockfish 16</b></span>
+            <span>Engine <b>Stockfish 19 Lite</b></span>
           </div>
         </section>
 

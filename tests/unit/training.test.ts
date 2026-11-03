@@ -375,6 +375,86 @@ describe("Exercise Generator (Section 3.7)", () => {
 
     expect(exercises.length).toBe(0); // rejected by rule 3
   });
+
+  it("never includes opponent mistakes in the user mistake list", () => {
+    const positions: PositionRecord[] = [
+      {
+        id: "p0",
+        game_id: "game-101",
+        user_id: "user-101",
+        ply: 0,
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        win_probability: 50,
+        score_cp: 0,
+        mate_in: null,
+        created_at: "2026-11-03T12:00:00Z"
+      },
+      {
+        id: "p1",
+        game_id: "game-101",
+        user_id: "user-101",
+        ply: 1,
+        fen: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+        move_san: "e4",
+        move_uci: "e2e4",
+        win_probability: 52,
+        score_cp: 20,
+        mate_in: null,
+        created_at: "2026-11-03T12:00:00Z"
+      },
+      {
+        id: "p2",
+        game_id: "game-101",
+        user_id: "user-101",
+        ply: 2,
+        fen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+        move_san: "f6", // Opponent blunders f6
+        move_uci: "f7f6",
+        win_probability: 75,
+        score_cp: 300,
+        mate_in: null,
+        created_at: "2026-11-03T12:00:00Z"
+      }
+    ];
+
+    const reports: MoveAnalysisReport[] = [
+      {
+        ply: 1,
+        mover: "white", // User move (good)
+        playedSan: "e4",
+        playedUci: "e2e4",
+        bestSan: "e4",
+        bestUci: "e2e4",
+        evalBefore: 50,
+        evalAfter: 52,
+        loss: 0,
+        classification: "best"
+      },
+      {
+        ply: 2,
+        mover: "black", // Opponent move (blunder)
+        playedSan: "f6",
+        playedUci: "f7f6",
+        bestSan: "e5",
+        bestUci: "e7e5",
+        evalBefore: 48,
+        evalAfter: 25,
+        loss: 23,
+        classification: "blunder"
+      }
+    ];
+
+    const { mistakes, exercises } = generateExercisesFromGame({
+      game: dummyGame,
+      positions,
+      reports,
+      userColour: "white" // User is White
+    });
+
+    // Opponent blunder at ply 2 should NOT be in user mistakes
+    expect(mistakes.length).toBe(0);
+    expect(exercises.length).toBe(0);
+  });
 });
 
 describe("Data Export Sovereignty (FR-112)", () => {

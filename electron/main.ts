@@ -3,6 +3,9 @@ import path from "node:path";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 
+// Allow local file access for Web Workers and WASM binaries in packaged desktop builds (file://)
+app.commandLine.appendSwitch("allow-file-access-from-files");
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,

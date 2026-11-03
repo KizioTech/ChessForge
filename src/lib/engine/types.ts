@@ -89,7 +89,14 @@ export interface Engine {
   isReady(): Promise<boolean>;
   evaluatePosition(
     fen: string,
-    options?: { depth?: number; multiPv?: number; signal?: AbortSignal }
+    options?: {
+      depth?: number;
+      multiPv?: number;
+      signal?: AbortSignal;
+      ply?: number;
+      moveSan?: string;
+      moveUci?: string;
+    }
   ): Promise<PositionEvaluation>;
   stop(): Promise<void>;
   dispose(): Promise<void>;

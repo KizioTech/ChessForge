@@ -1,26 +1,28 @@
 /**
- * stockfish-engine.ts — Web Worker Stockfish runner with MultiPV and analysis queue.
+ * stockfish-engine.ts — Real Stockfish 19 Lite Web Worker engine runner.
  *
  * Implements ADR 0004:
  * 1. Dedicated Web Worker execution isolating engine calculations from UI thread.
  * 2. Strict Engine interface (init, evaluatePosition, stop, dispose).
  * 3. Immediate White-relative score normalization.
  * 4. Cancellation via AbortSignal without state corruption.
+ *
+ * Guarantees:
+ * - Never returns fake or heuristic evaluations in production.
+ * - Throws if the Worker cannot be initialized or fails.
+ * - Rejects if an evaluation times out.
  */
 import { Chess } from "chess.js";
 import type {
   Engine,
   EngineConfig,
-  PositionEvaluation,
-  CandidateLine
+  PositionEvaluation
 } from "./types";
-import { parseUciInfoLine, buildPositionEvaluation, uciToSan } from "./uci-parser";
-import { calculateWinProbability } from "./win-probability";
+import { parseUciInfoLine, buildPositionEvaluation } from "./uci-parser";
 
 export class StockfishEngine implements Engine {
   private worker: Worker | null = null;
   private isInitialized = false;
-  private readyPromise: Promise<boolean> | null = null;
   private currentResolver: ((val: PositionEvaluation) => void) | null = null;
   private currentRejecter: ((err: Error) => void) | null = null;
   private candidateLines = new Map<number, any>();
@@ -43,34 +45,36 @@ export class StockfishEngine implements Engine {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Check for Worker support (Browser / Electron renderer)
-    if (typeof Worker !== "undefined") {
-      try {
-        // Create worker using Blob or standard worker script
-        this.worker = this.createWorker();
-        this.setupWorkerListeners();
+    if (typeof Worker === "undefined") {
+      throw new Error(
+        "Web Workers are not available in this environment. StockfishEngine requires Worker support."
+      );
+    }
 
-        this.sendCommand("uci");
-        this.sendCommand(`setoption name MultiPV value ${this.config.multiPv}`);
-        this.sendCommand(`setoption name Hash value ${this.config.hashMb}`);
-        this.sendCommand(`setoption name Threads value ${this.config.threads}`);
-        await this.isReady();
+    try {
+      this.worker = this.createWorker();
+      this.setupWorkerListeners();
 
-        this.isInitialized = true;
-      } catch (err) {
-        console.warn("Stockfish worker initialization fallback to heuristic engine:", err);
-        this.isInitialized = true;
-      }
-    } else {
-      // Node/Vitest environment
+      this.sendCommand("uci");
+      this.sendCommand(`setoption name MultiPV value ${this.config.multiPv}`);
+      this.sendCommand(`setoption name Hash value ${this.config.hashMb}`);
+      this.sendCommand(`setoption name Threads value ${this.config.threads}`);
+      await this.isReady();
+
       this.isInitialized = true;
+    } catch (err) {
+      this.worker = null;
+      this.isInitialized = false;
+      throw new Error(
+        `Failed to initialize Stockfish worker: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
   async isReady(): Promise<boolean> {
-    if (!this.worker) return true;
+    if (!this.worker) return false;
     const worker = this.worker;
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       const listener = (e: MessageEvent) => {
         if (
           typeof e.data === "string" &&
@@ -82,17 +86,25 @@ export class StockfishEngine implements Engine {
       };
       worker.addEventListener("message", listener);
       this.sendCommand("isready");
-      // Fallback timeout
+
       setTimeout(() => {
         worker.removeEventListener("message", listener);
-        resolve(true);
-      }, 1500);
+        // If engine doesn't reply within 3 seconds, reject
+        reject(new Error("Stockfish engine isready handshake timed out."));
+      }, 3000);
     });
   }
 
   async evaluatePosition(
     fen: string,
-    options?: { depth?: number; multiPv?: number; signal?: AbortSignal; ply?: number; moveSan?: string; moveUci?: string }
+    options?: {
+      depth?: number;
+      multiPv?: number;
+      signal?: AbortSignal;
+      ply?: number;
+      moveSan?: string;
+      moveUci?: string;
+    }
   ): Promise<PositionEvaluation> {
     await this.init();
 
@@ -100,46 +112,27 @@ export class StockfishEngine implements Engine {
       throw new DOMException("Evaluation aborted", "AbortError");
     }
 
+    if (!this.worker) {
+      throw new Error("Stockfish worker is not initialized or has crashed.");
+    }
+
     const depth = options?.depth ?? this.config.depth;
     const multiPv = options?.multiPv ?? this.config.multiPv;
     const ply = options?.ply ?? 0;
 
-    // Check for terminal positions (checkmate / stalemate)
-    try {
-      const chess = new Chess(fen);
-      if (chess.isGameOver()) {
-        return this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
-      }
-    } catch { /* proceed */ }
-
-    // If no Web Worker, use deterministic heuristic engine (for tests / offline fallback)
-    if (!this.worker) {
-      return this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
-    }
-
     return new Promise<PositionEvaluation>((resolve, reject) => {
       let settled = false;
 
-      // Safety timeout: guarantees evaluation never hangs indefinitely
+      // 10-second timeout: throws rather than silently faking an evaluation
       const timeoutId = setTimeout(() => {
         if (!settled) {
           settled = true;
-          const fallback =
-            this.candidateLines.size > 0
-              ? buildPositionEvaluation(
-                  this.currentPly,
-                  this.currentFen,
-                  this.candidateLines,
-                  this.bestMoveUci || this.candidateLines.get(1)?.pv[0] || "",
-                  this.currentMoveSan,
-                  this.currentMoveUci
-                )
-              : this.evaluateHeuristic(fen, ply, options?.moveSan, options?.moveUci);
+          this.sendCommand("stop");
           this.currentResolver = null;
           this.currentRejecter = null;
-          resolve(fallback);
+          reject(new Error(`Stockfish evaluation timed out at ply ${ply} (depth ${depth})`));
         }
-      }, 6000);
+      }, 10000);
 
       this.currentResolver = (val: PositionEvaluation) => {
         if (!settled) {
@@ -252,7 +245,7 @@ export class StockfishEngine implements Engine {
     this.worker.onerror = (err) => {
       console.error("Stockfish worker error:", err);
       if (this.currentRejecter) {
-        this.currentRejecter(new Error("Worker calculation error"));
+        this.currentRejecter(new Error("Stockfish Web Worker runtime error"));
         this.currentResolver = null;
         this.currentRejecter = null;
       }
@@ -260,118 +253,12 @@ export class StockfishEngine implements Engine {
   }
 
   private createWorker(): Worker {
-    try {
-      const workerUrl = typeof window !== "undefined"
-        ? new URL("stockfish.js", window.location.href).href
-        : "/stockfish.js";
-      return new Worker(workerUrl);
-    } catch {
-      // Fallback inline worker supporting MultiPV responses
-      const workerBlob = new Blob([
-        `
-        self.onmessage = function(e) {
-          var cmd = e.data;
-          if (cmd === 'uci') {
-            postMessage('id name ChessForge Stockfish 16 Lite');
-            postMessage('id author ChessForge Team');
-            postMessage('uciok');
-          } else if (cmd === 'isready') {
-            postMessage('readyok');
-          } else if (cmd.indexOf('go') === 0) {
-            setTimeout(function() {
-              postMessage('info depth 12 multipv 1 score cp 25 pv e2e4 e7e5 g1f3 b8c6');
-              postMessage('info depth 12 multipv 2 score cp 12 pv d2d4 d7d5 c2c4 e7e6');
-              postMessage('info depth 12 multipv 3 score cp -5 pv g1f3 d7d5 g2g3 c7c5');
-              postMessage('bestmove e2e4');
-            }, 60);
-          }
-        };
-        `
-      ], { type: "application/javascript" });
-      return new Worker(URL.createObjectURL(workerBlob));
+    let workerUrl: string;
+    if (typeof window !== "undefined") {
+      workerUrl = new URL("stockfish.js", window.location.href).href;
+    } else {
+      workerUrl = "/stockfish.js";
     }
-  }
-
-  /**
-   * Deterministic material + positional evaluation for environments without workers.
-   */
-  private evaluateHeuristic(
-    fen: string,
-    ply: number,
-    moveSan?: string,
-    moveUci?: string
-  ): PositionEvaluation {
-    const chess = new Chess(fen);
-    const moves = chess.moves({ verbose: true });
-
-    // Standard piece values
-    const pieceVals: Record<string, number> = {
-      p: 100,
-      n: 320,
-      b: 330,
-      r: 500,
-      q: 900,
-      k: 0
-    };
-
-    let materialWhite = 0;
-    let materialBlack = 0;
-    const board = chess.board();
-
-    for (let r = 0; r < 8; r++) {
-      for (let c = 0; c < 8; c++) {
-        const piece = board[r][c];
-        if (piece) {
-          const val = pieceVals[piece.type] || 0;
-          if (piece.color === "w") materialWhite += val;
-          else materialBlack += val;
-        }
-      }
-    }
-
-    let scoreCp = materialWhite - materialBlack;
-    let mateIn: number | null = null;
-
-    if (chess.isCheckmate()) {
-      mateIn = chess.turn() === "w" ? -1 : 1;
-      scoreCp = chess.turn() === "w" ? -30000 : 30000;
-    } else if (chess.isDraw() || chess.isStalemate()) {
-      scoreCp = 0;
-    }
-
-    const bestMove = moves[0];
-    const bestMoveUci = bestMove ? `${bestMove.from}${bestMove.to}${bestMove.promotion || ""}` : "";
-    const bestMoveSan = bestMove?.san || "";
-
-    const lines: CandidateLine[] = moves.slice(0, 3).map((m, idx) => {
-      const lineScore = mateIn !== null ? mateIn : scoreCp - idx * 25;
-      const uci = `${m.from}${m.to}${m.promotion || ""}`;
-      return {
-        rank: idx + 1,
-        scoreCp: lineScore,
-        mateIn,
-        uci,
-        san: m.san,
-        pv: [uci],
-        pvSan: m.san
-      };
-    });
-
-    const winProbability = calculateWinProbability(scoreCp, mateIn);
-
-    return {
-      ply,
-      fen,
-      depth: 16,
-      scoreCp,
-      mateIn,
-      winProbability,
-      bestMoveUci,
-      bestMoveSan,
-      lines,
-      moveSan,
-      moveUci
-    };
+    return new Worker(workerUrl);
   }
 }
-

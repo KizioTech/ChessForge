@@ -21,7 +21,7 @@ import type {
   ExerciseType,
   ExerciseDifficulty
 } from "./types";
-import { getMoverWinProbability } from "../engine/win-probability";
+import { getMoverWinProbability, calculateWinProbability } from "../engine/win-probability";
 
 export interface ExerciseGenerationInput {
   game: GameRecord;
@@ -93,7 +93,10 @@ export function generateExercisesFromGame({
   const allMistakes: MistakeRecord[] = [];
 
   for (const report of reports) {
-    // Collect all mistakes for the database record
+    // Rule 1: Only collect and train on the user's own moves
+    if (report.mover !== playerColour) continue;
+
+    // Collect user mistakes for the database record
     if (
       report.classification === "mistake" ||
       report.classification === "blunder" ||
@@ -105,7 +108,7 @@ export function generateExercisesFromGame({
       if (posBefore && posAfter) {
         allMistakes.push({
           id: `mistake-${game.id}-${report.ply}`,
-          user_id: game.user_id ?? "",
+          user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
           game_id: game.id,
           position_id: posAfter.id,
           ply: report.ply,
@@ -122,8 +125,7 @@ export function generateExercisesFromGame({
       }
     }
 
-    // Rule 1: Mover is the user and classification is Mistake or Blunder
-    if (report.mover !== playerColour) continue;
+    // Only mistakes and blunders become candidate exercises
     if (report.classification !== "mistake" && report.classification !== "blunder") continue;
 
     const posBefore = positions.find(p => p.ply === report.ply - 1);
@@ -144,9 +146,7 @@ export function generateExercisesFromGame({
     if (pvLines.length > 0) {
       const best = pvLines[0];
       const bestProb = getMoverWinProbability(
-        best.scoreCp !== null && best.scoreCp !== undefined
-          ? Math.round(50 + (best.scoreCp / 100) * 10)
-          : 50,
+        calculateWinProbability(best.scoreCp ?? null, best.mateIn ?? null),
         playerColour
       );
 
@@ -161,9 +161,7 @@ export function generateExercisesFromGame({
       if (pvLines.length > 1) {
         const second = pvLines[1];
         const secondProb = getMoverWinProbability(
-          second.scoreCp !== null && second.scoreCp !== undefined
-            ? Math.round(50 + (second.scoreCp / 100) * 10)
-            : 50,
+          calculateWinProbability(second.scoreCp ?? null, second.mateIn ?? null),
           playerColour
         );
 
@@ -173,9 +171,7 @@ export function generateExercisesFromGame({
         for (let i = 1; i < pvLines.length; i++) {
           const cand = pvLines[i];
           const candProb = getMoverWinProbability(
-            cand.scoreCp !== null && cand.scoreCp !== undefined
-              ? Math.round(50 + (cand.scoreCp / 100) * 10)
-              : 50,
+            calculateWinProbability(cand.scoreCp ?? null, cand.mateIn ?? null),
             playerColour
           );
           if (bestProb - candProb <= 3) {
@@ -190,8 +186,8 @@ export function generateExercisesFromGame({
         }
 
         // Section 3.7: Must either be single solution (diff >= 10) or multi-solution
-        if (solutions.length === 1 && diff < 8) {
-          // Ambiguous single candidate line that doesn't strongly beat #2
+        if (solutions.length === 1 && diff < 10) {
+          // Ambiguous single candidate line that doesn't strongly beat #2 (diff < 10 points)
           continue;
         }
       }
@@ -224,7 +220,7 @@ export function generateExercisesFromGame({
 
     return {
       id: `ex-${game.id}-${item.report.ply}`,
-      user_id: game.user_id ?? "",
+      user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
       game_id: game.id,
       mistake_id: `mistake-${game.id}-${item.report.ply}`,
       fen: item.posBefore.fen,

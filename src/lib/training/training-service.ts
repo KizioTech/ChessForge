@@ -15,6 +15,8 @@ import type {
 } from "./types";
 import { calculateNextReview, SM2_DEFAULTS } from "./sm2";
 
+export const LOCAL_GUEST_USER_ID = "00000000-0000-0000-0000-000000000000";
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isRealUuid(id: string | null | undefined): boolean {
@@ -59,7 +61,7 @@ export async function saveGeneratedExercises(
   // 1. Build initial review schedules for exercises
   const schedules: ReviewScheduleRecord[] = exercises.map(ex => ({
     exercise_id: ex.id,
-    user_id: ex.user_id || userId || "local",
+    user_id: ex.user_id || userId || LOCAL_GUEST_USER_ID,
     due_at: nowIso,
     interval_days: 1.0,
     ease_factor: SM2_DEFAULTS.INITIAL_EASE,
@@ -206,7 +208,7 @@ export async function recordAttemptAndAdvanceSchedule(
 
   const updatedSched: ReviewScheduleRecord = {
     exercise_id: exercise.id,
-    user_id: currentSched?.user_id || userId || "local",
+    user_id: currentSched?.user_id || userId || LOCAL_GUEST_USER_ID,
     due_at: sm2Result.dueAt.toISOString(),
     interval_days: sm2Result.intervalDays,
     ease_factor: sm2Result.easeFactor,
@@ -234,7 +236,7 @@ export async function recordAttemptAndAdvanceSchedule(
   const attempts = getLocal<ExerciseAttemptRecord>(LS_ATTEMPTS);
   attempts.push({
     exercise_id: exercise.id,
-    user_id: userId || "local",
+    user_id: userId || LOCAL_GUEST_USER_ID,
     attempted_at: now.toISOString(),
     correct: attempt.correct,
     duration_ms: attempt.durationMs,
