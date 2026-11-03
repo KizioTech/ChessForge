@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-11-03
 
 ### Added
+- **Visual Presentation for Check and Checkmate**:
+  - Connected `check: game.inCheck()` to Chessground configuration and state update lifecycle, highlighting the checked king in red.
+  - Added pulsating radial crimson highlight style and glow animation for `cg-board square.check`.
+  - Added floating game-over banners on the board for Checkmate (`CHECKMATE — [Color] wins by checkmate`) and Stalemate/Draw.
+  - Added top toolbar badges in analysis mode showing `[Crown] CHECKMATE · [Color] wins`, `[AlertTriangle] [Color] in check`, and `DRAW · Stalemate`.
+  - Disabled board piece movements automatically when `game.isGameOver()` is true.
+  - Added unit test in `tests/unit/chess-rules.test.ts` verifying Scholar's Mate checkmate detection (`Qxf7#`).
 - **Playwright E2E Smoke Test** `tests/e2e/smoke.spec.ts` & `playwright.config.ts`:
   - Verifies application shell, titlebar, and workspace headers.
   - Tests AuthModal flow: opens modal, toggles Sign In / Create Account, validates headings, closes modal.
@@ -46,10 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Supabase migration `supabase/migrations/20261103000000_create_profiles.sql` — `profiles` table, signup trigger, RLS policies.
 - Supabase client helper `src/lib/supabase.ts`.
 - License registry `docs/licences.md`.
-- Unit test suites: `tests/unit/chess-rules.test.ts` (6 tests), `tests/unit/supabase.test.ts` (2 tests) — all 8 pass.
+- Unit test suites: `tests/unit/chess-rules.test.ts` (7 tests), `tests/unit/supabase.test.ts` (2 tests) — all 9 pass.
 - Playwright E2E test suite: `tests/e2e/smoke.spec.ts` (1 passed).
 
 ### Fixed
+- **Playwright E2E timeout in GitHub Actions CI** — root cause: CI environment lacked `VITE_SUPABASE_*` environment variables during `vite build`, causing `AuthModal` to display the "Supabase Unconfigured" warning card instead of the auth form with the "Create one" toggle button. Fixed by supplying environment variables in `.github/workflows/ci.yml` and making `smoke.spec.ts` resilient across all environments.
+- **Missing check & checkmate visual presentation** — root cause: Chessground requires `check: true` to render `<square class="check">`. Fixed by connecting `game.inCheck()` to Chessground config and state updates, adding pulsating radial red glow CSS, adding floating Checkmate/Stalemate board banners, and adding status chips to the analysis board topline.
 - **Analysis page crash on Black's first move** — root cause: `makeMove` was creating `new Chess(fen)` (losing history), then `displayGame` replayed verbose move objects (with `before`/`after` FEN fields) against a fresh `Chess()`, causing FEN mismatch. Fixed by switching to SAN-array state and SAN-based replay.
 - **UI not reflecting logged-in state after sign-in** — root cause: multiple `useAuth()` instances created separate states; lifted into single `AuthContext`.
 - **Auth modal used magic link only** — fully rewritten to email+password primary flow with Google OAuth as alternative.

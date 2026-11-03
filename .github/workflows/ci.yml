@@ -14,6 +14,10 @@ jobs:
   quality:
     name: Typecheck · Lint · Test
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://rjxpuxmwdcqgierciqpg.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_YZ1-95b9QTsovRp_NVQsaA_ORlXNvyC
+      VITE_SUPABASE_ANON_KEY: sb_publishable_YZ1-95b9QTsovRp_NVQsaA_ORlXNvyC
 
     steps:
       - uses: actions/checkout@v4

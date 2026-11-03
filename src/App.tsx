@@ -310,7 +310,26 @@ function Analysis({ game, onMove, onUndo, history, movePairs, historyIndex, goTo
     <div className="analysis-meta panel"><div className="player"><div className="player-avatar white-avatar">W</div><div><strong>White</strong><span>makawa7 · 1,205</span></div></div><span className="versus">VS</span><div className="player"><div className="player-avatar black-avatar">B</div><div><strong>Black</strong><span>Opponent · unrated</span></div></div><div className="meta-divider"/><div className="meta-item"><Clock3 size={14}/> Rapid · 10+0</div><div className="meta-item"><CalendarClock size={14}/> Sample game</div><span className="sample-label">DEMO POSITION</span></div>
     <div className="analysis-layout">
       <section className="board-panel panel">
-        <div className="board-topline"><span><span className="live-dot"/> BOARD</span><span className="turn-label">{game.turn()==="w"?"White":"Black"} to move</span></div>
+        <div className="board-topline">
+          <span><span className="live-dot"/> BOARD</span>
+          <span className="turn-label">
+            {game.isCheckmate() ? (
+              <span className="status-pill status-checkmate" style={{ color: "#ff5252", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                <Crown size={13} /> CHECKMATE · {game.turn() === "w" ? "Black" : "White"} wins
+              </span>
+            ) : game.isStalemate() || (game.isDraw() && !game.isCheckmate()) ? (
+              <span className="status-pill status-draw" style={{ color: "#fbbf24", fontWeight: 600 }}>
+                DRAW · {game.isStalemate() ? "Stalemate" : "Drawn game"}
+              </span>
+            ) : game.inCheck() ? (
+              <span className="status-pill status-check" style={{ color: "#ff5252", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                <AlertTriangle size={13} /> {game.turn() === "w" ? "White" : "Black"} in check
+              </span>
+            ) : (
+              `${game.turn() === "w" ? "White" : "Black"} to move`
+            )}
+          </span>
+        </div>
         <div className="board-stage"><EvaluationRail/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
         <div className="board-controls">
           <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>

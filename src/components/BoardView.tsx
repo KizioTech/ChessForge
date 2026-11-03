@@ -67,9 +67,10 @@ export function BoardView({
         fen: game.fen(),
         orientation,
         turnColor: turn,
+        check: game.inCheck(),
         movable: {
           free: false,
-          color: interactive ? turn : undefined,
+          color: interactive && !game.isGameOver() ? turn : undefined,
           dests,
           events: {
             after: handleMove
@@ -102,8 +103,9 @@ export function BoardView({
         fen: game.fen(),
         orientation,
         turnColor: turn,
+        check: game.inCheck(),
         movable: {
-          color: interactive ? turn : undefined,
+          color: interactive && !game.isGameOver() ? turn : undefined,
           dests,
           events: {
             after: handleMove
@@ -177,6 +179,22 @@ export function BoardView({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Visual Presentation for Checkmate */}
+      {game.isCheckmate() && (
+        <div className="board-game-over-banner checkmate-banner" role="status" aria-live="polite">
+          <span className="game-over-title">CHECKMATE</span>
+          <span className="game-over-sub">{game.turn() === "w" ? "Black" : "White"} wins by checkmate</span>
+        </div>
+      )}
+
+      {/* Visual Presentation for Stalemate / Draw */}
+      {(game.isStalemate() || (game.isDraw() && !game.isCheckmate())) && (
+        <div className="board-game-over-banner stalemate-banner" role="status" aria-live="polite">
+          <span className="game-over-title">{game.isStalemate() ? "STALEMATE" : "DRAW"}</span>
+          <span className="game-over-sub">{game.isStalemate() ? "Draw by stalemate" : "Game drawn"}</span>
         </div>
       )}
     </div>

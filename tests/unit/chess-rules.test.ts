@@ -84,4 +84,23 @@ describe("Chess Core Rules & Legality Verification", () => {
     expect(game.getCastlingRights("w")).toEqual({ k: true, q: true });
     expect(game.board().length).toBe(8);
   });
+
+  it("identifies check and checkmate correctly", () => {
+    // Scholar's mate: 1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#
+    const scholarsMate = new Chess();
+    scholarsMate.move("e4");
+    scholarsMate.move("e5");
+    scholarsMate.move("Bc4");
+    scholarsMate.move("Nc6");
+    scholarsMate.move("Qh5");
+    scholarsMate.move("Nf6");
+    expect(scholarsMate.inCheck()).toBe(false);
+
+    const mateMove = scholarsMate.move("Qxf7#");
+    expect(mateMove.san).toBe("Qxf7#");
+    expect(scholarsMate.inCheck()).toBe(true);
+    expect(scholarsMate.isCheckmate()).toBe(true);
+    expect(scholarsMate.isGameOver()).toBe(true);
+    expect(scholarsMate.turn()).toBe("b"); // Black is checkmated
+  });
 });
