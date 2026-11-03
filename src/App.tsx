@@ -7,9 +7,12 @@ import {
   Command, Crosshair, Crown, Database, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
-  X, Zap
+  X, Zap, LogIn, LogOut, User as UserIcon
 } from "lucide-react";
 import type { Page } from "./types";
+import { BoardView } from "./components/BoardView";
+import { AuthModal } from "./components/AuthModal";
+import { useAuth } from "./lib/auth";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -103,30 +106,48 @@ function EvaluationRail({ value = 0.35 }: { value?: number }) {
 }
 
 function App() {
+  const { user, profile, signOut } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [orientation, setOrientation] = useState<"white" | "black">("white");
   const [page, setPage] = useState<Page>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [game, setGame] = useState(() => new Chess(initialFen));
+  const [moves, setMoves] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
 
+  // Replay all moves up to the full length to build the "master" game state
+  const game = useMemo(() => {
+    const g = new Chess();
+    moves.forEach(san => g.move(san));
+    return g;
+  }, [moves]);
+
   const history = game.history({ verbose: true });
+
+  // Build the display game up to historyIndex (for move navigation)
   const displayGame = useMemo(() => {
     const g = new Chess();
-    history.slice(0, historyIndex).forEach(m => g.move(m));
+    history.slice(0, historyIndex).forEach(m => g.move(m.san));
     return g;
-  }, [historyIndex, game.fen()]);
+  }, [historyIndex, history]);
+
   const legalTargets = selected
     ? displayGame.moves({ square: selected, verbose: true }).map(m => m.to)
     : [];
 
-  function makeMove(from: Square, to: Square) {
+  function makeMove(from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") {
     try {
-      const next = new Chess(displayGame.fen());
-      next.move({ from, to, promotion: "q" });
-      setGame(next);
-      setHistoryIndex(next.history().length);
+      // Build a temporary game at the current display position to validate the move
+      const temp = new Chess(displayGame.fen());
+      const result = temp.move({ from, to, promotion: promotion || "q" });
+      if (!result) { setSelected(null); return; }
+
+      // Truncate any future moves after historyIndex, then append the new SAN
+      const newMoves = [...moves.slice(0, historyIndex), result.san];
+      setMoves(newMoves);
+      setHistoryIndex(newMoves.length);
       setSelected(null);
     } catch { setSelected(null); }
   }
@@ -139,18 +160,36 @@ function App() {
   const movePairs = [];
   for (let i=0; i<history.length; i+=2) movePairs.push({ n: i/2+1, white: history[i], black: history[i+1] });
 
+  const userInitials = (profile?.display_name || user?.email || "JM")
+    .slice(0, 2)
+    .toUpperCase();
+  const userDisplayName = profile?.display_name || user?.email?.split("@")[0] || "My ChessForge";
+
   return <div className="app-shell">
     <header className="titlebar">
       <div className="titlebar-brand"><div className="brand-mark"><ChessKnight size={18}/></div><span>CHESSFORGE</span><span className="brand-divider">/</span><span className="titlebar-context">{page}</span></div>
-      <div className="titlebar-center"><span className="status-dot"/> Personal workspace <span className="titlebar-sep">·</span> Local session</div>
-      <div className="titlebar-actions"><button className="icon-btn" title="Help"><CircleHelp size={15}/></button><button className="icon-btn" title="Settings" onClick={() => setPage("Analytics")}><Settings2 size={15}/></button><div className="avatar">JM</div></div>
+      <div className="titlebar-center"><span className="status-dot"/> Personal workspace <span className="titlebar-sep">·</span> {user ? user.email : "Local session"}</div>
+      <div className="titlebar-actions">
+        {user ? (
+          <button className="button button-secondary button-small" onClick={() => signOut()} title="Sign out">
+            <LogOut size={13} /> Sign out
+          </button>
+        ) : (
+          <button className="button button-primary button-small" onClick={() => setShowAuthModal(true)} title="Sign in">
+            <LogIn size={13} /> Sign in
+          </button>
+        )}
+        <button className="icon-btn" title="Help"><CircleHelp size={15}/></button>
+        <button className="icon-btn" title="Settings" onClick={() => setPage("Analytics")}><Settings2 size={15}/></button>
+        <div className="avatar" title={user?.email || "Local session"}>{userInitials}</div>
+      </div>
     </header>
 
     <div className="app-body">
       {sidebarOpen && <aside className="sidebar">
-        <div className="profile-switcher">
-          <div className="profile-avatar">JM</div>
-          <div className="profile-copy"><strong>My ChessForge</strong><span>Personal account</span></div>
+        <div className="profile-switcher" onClick={() => !user && setShowAuthModal(true)} style={{ cursor: "pointer" }}>
+          <div className="profile-avatar">{userInitials}</div>
+          <div className="profile-copy"><strong>{userDisplayName}</strong><span>{user ? user.email : "Personal account (sign in)"}</span></div>
           <ChevronDown size={14} className="muted"/>
         </div>
         {navGroups.map(group => <div className="nav-group" key={group.label}>
@@ -180,11 +219,12 @@ function App() {
         </div>
 
         {page === "Dashboard" && <Dashboard onNavigate={setPage} onImport={() => setShowImport(true)}/>}
-        {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} selected={selected} setSelected={setSelected} legalTargets={legalTargets} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove}/>}
+        {page === "Analysis" && <Analysis game={displayGame} onMove={makeMove} history={history} movePairs={movePairs} historyIndex={historyIndex} goToMove={goToMove} orientation={orientation} setOrientation={setOrientation}/>}
         {page !== "Dashboard" && page !== "Analysis" && <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>}
       </main>
     </div>
     {showImport && <ImportDialog onClose={() => setShowImport(false)}/>}
+    <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
   </div>;
 }
 
@@ -238,15 +278,15 @@ function StatCard({ label, value, change, icon, tone }: {label:string;value:stri
   return <div className="stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tone||""}`}>{icon}</span></div><div className="stat-value">{value}</div><div className="stat-change">{change}</div></div>;
 }
 
-function Analysis({ game, onMove, selected, setSelected, legalTargets, history, movePairs, historyIndex, goToMove }: any) {
+function Analysis({ game, onMove, history, movePairs, historyIndex, goToMove, orientation, setOrientation }: any) {
   return <div className="content analysis-content">
     <div className="analysis-heading"><div><div className="eyebrow">GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span></div><h1>Analysis workspace</h1><p className="subheading">Explore a position, navigate moves and inspect the analysis layout.</p></div><div className="analysis-actions"><button className="button button-secondary"><MoreHorizontal size={15}/> Options</button><button className="button button-primary"><Sparkles size={14}/> Analyse game</button></div></div>
     <div className="analysis-meta panel"><div className="player"><div className="player-avatar white-avatar">W</div><div><strong>White</strong><span>makawa7 · 1,205</span></div></div><span className="versus">VS</span><div className="player"><div className="player-avatar black-avatar">B</div><div><strong>Black</strong><span>Opponent · unrated</span></div></div><div className="meta-divider"/><div className="meta-item"><Clock3 size={14}/> Rapid · 10+0</div><div className="meta-item"><CalendarClock size={14}/> Sample game</div><span className="sample-label">DEMO POSITION</span></div>
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline"><span><span className="live-dot"/> BOARD</span><span className="turn-label">{game.turn()==="w"?"White":"Black"} to move</span></div>
-        <div className="board-stage"><EvaluationRail/><ChessBoard game={game} onMove={onMove} selected={selected} setSelected={setSelected} legalTargets={legalTargets}/></div>
-        <div className="board-controls"><button className="icon-btn" onClick={()=>goToMove(0)} title="Start"><ArrowLeft size={15}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move"><ChevronLeft size={16}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move"><ChevronRight size={16}/></button><button className="icon-btn" onClick={()=>goToMove(history.length)} title="End"><ArrowRight size={15}/></button><span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span><button className="icon-btn flip-btn" title="Flip board"><ArrowDownRight size={15}/></button></div>
+        <div className="board-stage"><EvaluationRail/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
+        <div className="board-controls"><button className="icon-btn" onClick={()=>goToMove(0)} title="Start"><ArrowLeft size={15}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move"><ChevronLeft size={16}/></button><button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move"><ChevronRight size={16}/></button><button className="icon-btn" onClick={()=>goToMove(history.length)} title="End"><ArrowRight size={15}/></button><span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span><button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button></div>
       </section>
       <aside className="analysis-side">
         <section className="panel evaluation-panel"><div className="panel-head"><div><div className="eyebrow">ENGINE EVALUATION</div><h2>Position assessment</h2></div><span className="engine-badge"><span className="status-muted"/> Offline</span></div><div className="eval-main"><span className="eval-score">—</span><span className="eval-caption">Stockfish not connected</span></div><div className="engine-placeholder"><Zap size={15}/><span>Connect the local engine to calculate evaluations and candidate lines.</span></div><div className="engine-settings"><span>Depth <b>—</b></span><span>MultiPV <b>—</b></span><span>Engine <b>Stockfish</b></span></div></section>
