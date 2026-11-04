@@ -13,7 +13,8 @@
     "test:e2e": "npm run build && playwright test",
     "start": "electron .",
     "preview": "vite preview",
-    "postinstall": "node -e \"const fs=require('fs');const path=require('path');const bin=path.join('node_modules','stockfish','bin');try{fs.mkdirSync('public',{recursive:true});fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.js'),path.join('public','stockfish.js'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish.wasm'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish-19-lite-single.wasm'));}catch(e){}\""
+    "postinstall": "node -e \"const fs=require('fs');const path=require('path');const bin=path.join('node_modules','stockfish','bin');try{fs.mkdirSync('public',{recursive:true});fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.js'),path.join('public','stockfish.js'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish.wasm'));fs.copyFileSync(path.join(bin,'stockfish-19-lite-single.wasm'),path.join('public','stockfish-19-lite-single.wasm'));}catch(e){}\"",
+    "dist:app": "npm run build && electron-builder"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -33,6 +34,7 @@
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron": "^33.2.1",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^5.1.0",
@@ -45,14 +47,45 @@
   "build": {
     "appId": "com.kiziotech.chessforge",
     "productName": "ChessForge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
     "win": {
-      "icon": "public/logo.ico"
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "icon": "public/logo.png"
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png"
     },
     "linux": {
-      "icon": "public/logo.png"
-    }
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    },
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ]
   }
 }

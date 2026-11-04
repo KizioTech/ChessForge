@@ -8,12 +8,21 @@ const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 app.commandLine.appendSwitch("allow-file-access-from-files");
 
 function getAppIcon(): string | undefined {
-  const iconCandidates = [
-    path.join(__dirname, isDev ? "../public/logo.ico" : "../dist/logo.ico"),
-    path.join(__dirname, isDev ? "../public/logo.png" : "../dist/logo.png"),
-    path.join(process.cwd(), "public", "logo.ico"),
-    path.join(process.cwd(), "public", "logo.png"),
-  ];
+  // In a packaged app __dirname is inside app.asar; resources sit beside it.
+  const resourcesDir = process.resourcesPath ?? path.join(__dirname, "..");
+
+  const iconCandidates = isDev
+    ? [
+        path.join(__dirname, "../build/icon.ico"),
+        path.join(__dirname, "../build/icon.png"),
+      ]
+    : [
+        path.join(resourcesDir, "icon.ico"),
+        path.join(resourcesDir, "icon.png"),
+        path.join(__dirname, "../dist/logo.ico"),
+        path.join(__dirname, "../dist/logo.png"),
+      ];
+
   for (const candidate of iconCandidates) {
     if (fs.existsSync(candidate)) return candidate;
   }

@@ -16,3 +16,4 @@ blob-report/
 public/stockfish-19-lite-single.wasm
 public/stockfish-19-single.wasm
 public/stockfish-19.wasm
+build/
