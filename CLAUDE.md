@@ -27,6 +27,7 @@ npm install         install dependencies
 npm run dev         run the development environment (Vite + Electron)
 npm run build       build renderer and electron bundles
 npm start           run electron from dist build
+npm run dist:app    build installer (output: release/) — Windows NSIS, macOS DMG, Linux AppImage
 npm test            run unit tests
 npm run test:e2e    run Playwright smoke tests
 

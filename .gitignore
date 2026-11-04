@@ -1,7 +1,7 @@
 node_modules/
 dist/
 dist-electron/
-.release/
+.release//
 *.log
 .DS_Store
 .env
@@ -10,7 +10,7 @@ dist-electron/
 test-results/
 playwright-report/
 blob-report/
-
+release/
 # Stockfish WASM binaries (large, served from public/ at runtime)
 # Restore with: npm run postinstall (or copy from node_modules/stockfish/bin/)
 public/stockfish-19-lite-single.wasm

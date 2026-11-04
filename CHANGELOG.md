@@ -12,9 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
-- **Gate Status:** Phase 4 completed and signed off at `v1.0.0` (Release 1 - The Loop Complete).
+- **Gate Status:** Phase 4 completed and signed off. v0.4.0 public installer release shipped.
 
-### Fixed & Hardened
+---
+
+## [0.4.0] - 2026-11-04
+
+### Release: First Public Installer
+
+#### Added
+- **Electron Desktop Packaging**: Integrated `electron-builder` to produce native platform installers.
+  - Windows: NSIS installer (`ChessForge Setup 0.4.0.exe`) with user-selectable install directory.
+  - macOS: DMG (`.dmg`).
+  - Linux: AppImage (`.AppImage`).
+- **`dist:app` npm script**: `npm run build && electron-builder` — single command to produce the full installer in `release/`.
+- **App icon assets** (`build/icon.ico`, `build/icon.png`) bundled as `extraResources` for packaged runtime access.
+- **GitHub Release `v0.4.0`**: Windows installer published to GitHub Releases for public download.
+
+#### Changed
+- `README.md` updated with download/install section, SmartScreen note, and `dist:app` build instructions.
+- `ROADMAP.md` Phase 9 (Desktop Packaging) marked complete ahead of schedule.
+
+---
+
+## [1.0.0] - 2026-11-03
+
+### Release 1: The Loop Complete
+Completes the core continuous training loop: game import -> Stockfish WASM analysis -> automated mistake detection -> exercise generation with eligibility rules -> modified SM-2 spaced repetition review queue -> interactive solving desk -> data sovereignty export.
+
+### Fixed & Hardened (shipped with v1.0.0)
 - **Engine Integrity & Error Handling**: Removed silent fallback fakes from `StockfishEngine`; initialization and timeouts now throw/reject to guarantee analysis veracity. Isolated test mock into `HeuristicEngine`.
 - **Exercise Generation Accuracy**: Solution scoring now calls `calculateWinProbability` (supporting mate evaluations accurately) and enforces the 10-point single-solution cutoff.
 - **Mistake Isolation**: Filtered out opponent mistakes to prevent stats and training queue pollution.
@@ -23,13 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security & Desktop Shell**: Added strict Content Security Policy (CSP) and favicon in `index.html`, added desktop app logo branding, and enabled `--allow-file-access-from-files` for packaged Electron worker execution.
 - **Settings & Branding**: Replaced preview badge with official `v1.0.0` tag in sidebar; added comprehensive Settings workspace with theme switching (Forge Dark, Midnight Blue, Forest Green, Classic Slate), engine/analysis preferences, training controls, data sovereignty exports, and About section crediting Author KizioTech and linking to GitHub (`https://github.com/KizioTech/ChessForge`).
 - **Documentation & Architecture Alignment**: Updated `CLAUDE.md`, `README.md`, and added ADR 0011 (Electron Desktop Runtime).
-
----
-
-## [1.0.0] - 2026-11-03
-
-### Release 1: The Loop Complete
-Completes the core continuous training loop: game import -> Stockfish WASM analysis -> automated mistake detection -> exercise generation with eligibility rules -> modified SM-2 spaced repetition review queue -> interactive solving desk -> data sovereignty export.
 
 ### Added
 - **Database Migration 000004 (`supabase/migrations/20261103000004_create_training_and_exercises.sql`)**:

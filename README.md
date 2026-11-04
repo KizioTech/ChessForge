@@ -8,7 +8,19 @@ ChessForge is a personal chess-improvement desktop application built on Electron
 - Node.js 20 or newer
 - npm
 
-## Run locally
+## Install
+
+Download the latest installer from the [GitHub Releases page](https://github.com/KizioTech/ChessForge/releases):
+
+| Platform | File |
+|---|---|
+| Windows | `ChessForge Setup x.x.x.exe` (NSIS installer) |
+| macOS | `ChessForge-x.x.x.dmg` |
+| Linux | `ChessForge-x.x.x.AppImage` |
+
+> **Windows SmartScreen:** Because the binary is currently unsigned, Windows Defender SmartScreen may show a warning on first run. Click **"More info → Run anyway"** to proceed.
+
+## Run locally (development)
 
 ```bash
 npm install
@@ -17,14 +29,25 @@ npm run dev
 
 The Vite dev server starts at `http://localhost:5173`; Electron opens the desktop window once the dev server is ready.
 
-## Build and run packaged app
+## Build and run packaged app (without installer)
 
 ```bash
 npm run build
 npm start
 ```
 
-## Implemented functionality (Release 1 — v1.0.0)
+## Build the installer
+
+```bash
+npm run dist:app
+```
+
+Output is written to `release/`. Targets:
+- **Windows:** NSIS installer (`.exe`) — user-selectable install directory
+- **macOS:** DMG (`.dmg`)
+- **Linux:** AppImage (`.AppImage`)
+
+## Implemented functionality (v0.4.0 — Public Release)
 
 - **Desktop Shell**: Electron desktop container with isolated renderer, native frame overlay, and strict Content Security Policy.
 - **Game Library**: PGN file upload, direct text paste, and account synchronization workflows with duplicate fingerprint detection.

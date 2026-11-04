@@ -153,10 +153,17 @@ Before closing any phase, every item below must be satisfied:
 
 ---
 
-### Phase 9: Desktop Packaging & Hardening (R5)
-- **Status:** Locked
-- **Release Target:** `v2.0.0`
+### Phase 9: Desktop Packaging & Hardening
+- **Status:** ✅ Complete (Signed off — delivered ahead of schedule as `v0.4.0` public installer release)
+- **Release Target:** ~~`v2.0.0`~~ Shipped early as `v0.4.0`
 - **Scope:** Desktop bundle hardening, native Stockfish execution, full offline capabilities, security audit.
+- **Delivered:**
+  - `electron-builder` integration producing NSIS installer (Windows), DMG (macOS), AppImage (Linux).
+  - `dist:app` npm script for single-command installer generation.
+  - App icons (`build/icon.ico`, `build/icon.png`) bundled as `extraResources`.
+  - `--allow-file-access-from-files` flag for packaged WASM Web Worker execution.
+  - Strict CSP enforced in `index.html`.
+  - GitHub Release `v0.4.0` published with Windows installer.
 
 ---
 
@@ -172,9 +179,14 @@ Before closing any phase, every item below must be satisfied:
 | Phase | Description | Current Status | Blocker / Next Step |
 |---|---|---|---|
 | **Phase 0** | Baseline & Golden Dataset | **In Progress** | Assemble 40-game spreadsheet for `makawa7` |
-| **Phase 1** | Foundation & Shell | **In Progress** | Electron shell fixed, working on project layout & Supabase auth |
-| **Phase 2** | Import & Library | **Locked** | Requires Phase 1 gate sign-off |
-| **Phase 3** | Analysis Engine | **Locked** | Requires Phase 2 gate sign-off |
-| **Phase 4** | Mistakes & Exercises | **Locked** | Requires Phase 3 gate sign-off |
-| **Phases 5-10**| Insight, Sync, Repertoire, etc. | **Locked** | Future milestones |
+| **Phase 1** | Foundation & Shell | ✅ **Complete** | Signed off — `v0.1.0` |
+| **Phase 2** | Import & Library | ✅ **Complete** | Signed off — `v0.2.0` |
+| **Phase 3** | Analysis Engine | ✅ **Complete** | Signed off — `v0.3.0` |
+| **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v1.0.0` (The Loop) |
+| **Phase 5** | Insight & Weakness Diagnosis | 🔄 **Active** | Heuristic tagging, trend charts — target `v1.1.0` |
+| **Phase 6** | Platform Integrations | **Locked** | Requires Phase 5 gate sign-off |
+| **Phase 7** | Opening Repertoires | **Locked** | Future milestone |
+| **Phase 8** | Endgame Lab & Calculation | **Locked** | Future milestone |
+| **Phase 9** | Desktop Packaging | ✅ **Complete** | Shipped early — `v0.4.0` public installer |
+| **Phase 10** | Multi-User & Public Readiness | **Locked** | Post-v2.0.0 |
 
