@@ -18,7 +18,9 @@ import { Sidebar } from "./components/Sidebar";
 import { EvalGraph } from "./components/EvalGraph";
 import { TrainingDesk } from "./components/TrainingDesk";
 import { ReviewQueue } from "./components/ReviewQueue";
+import { SettingsView } from "./components/SettingsView";
 import { useAuth } from "./lib/auth";
+import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
 import { getAnalysisForGame } from "./lib/analyses";
 import { analyzeGame, computeMoveClassifications } from "./lib/engine/game-analyzer";
@@ -108,6 +110,12 @@ function EvaluationRail({ value = 0.35 }: { value?: number }) {
 
 function App() {
   const { user, profile, signOut } = useAuth();
+
+  useEffect(() => {
+    const s = getSettings();
+    applyTheme(s.theme);
+  }, []);
+
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [orientation, setOrientation] = useState<"white" | "black">("white");
   const [page, setPage] = useState<Page>("Dashboard");
@@ -367,7 +375,7 @@ function App() {
           </button>
         )}
         <button className="icon-btn" title="Help"><CircleHelp size={15}/></button>
-        <button className="icon-btn" title="Settings" onClick={() => setPage("Analytics")}><Settings2 size={15}/></button>
+        <button className="icon-btn" title="Settings" onClick={() => setPage("Settings")}><Settings2 size={15}/></button>
         <div className="avatar" title={user?.email || "Local session"}>{userInitials}</div>
       </div>
     </header>
@@ -448,7 +456,13 @@ function App() {
             userId={user?.id}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && (
+        {page === "Settings" && (
+          <SettingsView
+            games={games}
+            onRefreshData={refreshGames}
+          />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>

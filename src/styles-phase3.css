@@ -217,3 +217,48 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Settings and Theme Overrides ─────────────────────────────────────── */
+[data-theme="forge-dark"] {
+  --bg: #101820;
+  --sidebar: #131f27;
+  --panel: #17242d;
+  --panel2: #1d2c35;
+  --raised: #22333c;
+  --line: #2a3a43;
+  --lime: #b7e36a;
+  --lime-dark: #26351b;
+}
+
+[data-theme="midnight-blue"] {
+  --bg: #0b1326;
+  --sidebar: #0f1a36;
+  --panel: #132247;
+  --panel2: #192d5c;
+  --raised: #1f376f;
+  --line: #254284;
+  --lime: #38bdf8;
+  --lime-dark: #0c334d;
+}
+
+[data-theme="forest-green"] {
+  --bg: #0b1812;
+  --sidebar: #0f2119;
+  --panel: #142a20;
+  --panel2: #1a3529;
+  --raised: #204133;
+  --line: #285140;
+  --lime: #4ade80;
+  --lime-dark: #123821;
+}
+
+[data-theme="classic-slate"] {
+  --bg: #14171d;
+  --sidebar: #191d25;
+  --panel: #1f242e;
+  --panel2: #272d3a;
+  --raised: #303746;
+  --line: #3b4455;
+  --lime: #f59e0b;
+  --lime-dark: #3d2806;
+}
+

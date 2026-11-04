@@ -6,4 +6,5 @@ export type Page =
   | "Review Queue"
   | "Openings"
   | "Endgames"
-  | "Analytics";
+  | "Analytics"
+  | "Settings";

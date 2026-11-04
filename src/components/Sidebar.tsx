@@ -110,17 +110,31 @@ export function Sidebar({
           <span className="status-dot" style={{ background: "var(--lime)" }} />
           <div>
             <strong style={{ color: "var(--lime)" }}>Engine connected</strong>
-            <small>Stockfish 16 WASM · MultiPV 3</small>
+            <small>Stockfish 19 Lite WASM · MultiPV 3</small>
           </div>
           <span className="status-muted" style={{ background: "var(--lime)", boxShadow: "0 0 6px var(--lime)" }} />
         </div>
-        <button className="nav-item" onClick={() => onNavigate("Analytics")}>
+        <button
+          className={`nav-item ${page === "Settings" ? "active" : ""}`}
+          onClick={() => onNavigate("Settings")}
+        >
           <Settings2 size={16} />
           <span>Settings</span>
         </button>
         <div className="sidebar-foot">
           <span>CHESSFORGE</span>
-          <span>v0.1.0 · Preview</span>
+          <span className="version-pill" style={{
+            fontSize: "9px",
+            background: "rgba(183, 227, 106, 0.12)",
+            color: "var(--lime)",
+            border: "1px solid rgba(183, 227, 106, 0.25)",
+            padding: "1px 6px",
+            borderRadius: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.5px"
+          }}>
+            v1.0.0
+          </span>
         </div>
       </div>
     </aside>

@@ -245,4 +245,26 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
     const exportBtn = page.getByRole("button", { name: "Export PGN" });
     await expect(exportBtn).toBeVisible();
   });
+
+  test("Settings view displays themes, engine options, KizioTech author, and repository link", async ({ page }) => {
+    await page.goto("/");
+
+    // Verify sidebar version tag is v1.0.0
+    await expect(page.locator(".sidebar-foot .version-pill")).toHaveText("v1.0.0");
+
+    // Navigate to Settings
+    const settingsNav = page.locator("button.nav-item", { hasText: "Settings" });
+    await settingsNav.click();
+    await expect(page.locator("h1")).toHaveText("Settings");
+
+    // Check Appearance tab themes
+    await expect(page.getByText("App Theme")).toBeVisible();
+    await expect(page.getByText("Forge Dark")).toBeVisible();
+    await expect(page.getByText("Midnight Blue")).toBeVisible();
+
+    // Switch to About & Credits tab
+    await page.getByRole("button", { name: "About & Credits" }).click();
+    await expect(page.getByText("KizioTech", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /github\.com\/KizioTech\/ChessForge/i })).toBeVisible();
+  });
 });

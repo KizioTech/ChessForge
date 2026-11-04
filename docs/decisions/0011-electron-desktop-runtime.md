@@ -42,3 +42,4 @@ We chose **Electron** as the desktop application container for ChessForge.
 
 - **Positive:** Guaranteed engine execution speed and Web Worker reliability; zero OS-dependent webview rendering bugs; full offline operability; native window frame overlays.
 - **Negative:** Larger application download footprint (~80 MB) and higher base memory usage compared to a minimal Tauri shell.
+

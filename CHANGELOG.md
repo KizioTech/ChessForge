@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **FEN-Based Move Classification**: Side to move is now derived directly from FEN in `computeMoveClassifications`, supporting arbitrary starting positions.
 - **Engine Provenance**: Re-labelled engine version from `16-wasm` to `19-lite-wasm` (`Stockfish 19 Lite`).
 - **Security & Desktop Shell**: Added strict Content Security Policy (CSP) and favicon in `index.html`, added desktop app logo branding, and enabled `--allow-file-access-from-files` for packaged Electron worker execution.
+- **Settings & Branding**: Replaced preview badge with official `v1.0.0` tag in sidebar; added comprehensive Settings workspace with theme switching (Forge Dark, Midnight Blue, Forest Green, Classic Slate), engine/analysis preferences, training controls, data sovereignty exports, and About section crediting Author KizioTech and linking to GitHub (`https://github.com/KizioTech/ChessForge`).
 - **Documentation & Architecture Alignment**: Updated `CLAUDE.md`, `README.md`, and added ADR 0011 (Electron Desktop Runtime).
 
 ---
