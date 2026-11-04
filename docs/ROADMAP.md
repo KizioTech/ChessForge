@@ -125,7 +125,7 @@ Before closing any phase, every item below must be satisfied:
 
 ### Phase 5: Insight & Weakness Diagnosis (R2)
 - **Status:** In Progress (Current Active Dev Phase — Phase 4 signed off)
-- **Release Target:** `v1.1.0`
+- **Release Target:** `v0.5.0`
 - **Scope:** Heuristic mistake tagging (hanging piece, missed mate, fork, back-rank), time-trouble detection, performance trend charts with sample sizes (N >= 20).
 - **Exit Criteria:** >= 70% agreement on Phase 0 golden dataset for all shipped tags.
 
@@ -133,7 +133,7 @@ Before closing any phase, every item below must be satisfied:
 
 ### Phase 6: Platform Integrations (R2)
 - **Status:** Locked (Pending Phase 5 completion)
-- **Release Target:** `v1.2.0`
+- **Release Target:** `v0.6.0`
 - **Scope:** Automated sync from Chess.com (monthly archives + ETags) and Lichess (rate-limited stream API), background sync checkpoints and logging.
 - **Exit Criteria:** Sync operates automatically, handles rate limits (429 backoff), and does not re-import duplicates.
 
@@ -141,14 +141,14 @@ Before closing any phase, every item below must be satisfied:
 
 ### Phase 7: Opening Repertoires (R3)
 - **Status:** Locked
-- **Release Target:** `v1.3.0`
+- **Release Target:** `v0.7.0`
 - **Scope:** Opening repertoire trees for White and Black, practice drilling, game deviation alerts.
 
 ---
 
 ### Phase 8: Endgame Lab & Calculation (R4)
 - **Status:** Locked
-- **Release Target:** `v1.4.0`
+- **Release Target:** `v0.8.0`
 - **Scope:** Technical endgame practice, tablebase integration, calculation trainer.
 
 ---
@@ -182,8 +182,8 @@ Before closing any phase, every item below must be satisfied:
 | **Phase 1** | Foundation & Shell | ✅ **Complete** | Signed off — `v0.1.0` |
 | **Phase 2** | Import & Library | ✅ **Complete** | Signed off — `v0.2.0` |
 | **Phase 3** | Analysis Engine | ✅ **Complete** | Signed off — `v0.3.0` |
-| **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v1.0.0` (The Loop) |
-| **Phase 5** | Insight & Weakness Diagnosis | 🔄 **Active** | Heuristic tagging, trend charts — target `v1.1.0` |
+| **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v0.4.0` (The Loop) |
+| **Phase 5** | Insight & Weakness Diagnosis | 🔄 **Active** | Heuristic tagging, trend charts — target `v0.5.0` |
 | **Phase 6** | Platform Integrations | **Locked** | Requires Phase 5 gate sign-off |
 | **Phase 7** | Opening Repertoires | **Locked** | Future milestone |
 | **Phase 8** | Endgame Lab & Calculation | **Locked** | Future milestone |

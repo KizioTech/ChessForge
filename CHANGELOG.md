@@ -12,7 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
-- **Gate Status:** Phase 4 completed and signed off. v0.4.0 public installer release shipped.
+- **Target Release:** v0.5.0
+- **Gate Status:** In Progress on branch `phase-5/insight-weakness-diagnosis`
+
+### Added
+- **Deterministic Heuristic Mistake Tagger** (`src/lib/insight/mistake-tagger.ts`): Automatically identifies recurring mistake categories (`hanging_piece`, `missed_mate`, `missed_fork`, `back_rank_weakness`, `time_trouble`, and `missed_tactic`) with confidence metrics.
+- **Longitudinal Trend Service** (`src/lib/insight/trend-service.ts`): Aggregates user mistakes, computes blunders per 100 moves, and enforces the Core Principle #3 baseline guard (`N >= 20` games).
+- **Analytics View** (`src/components/AnalyticsView.tsx`): Dedicated analytics page visualizing tactical blindspots, time-trouble vulnerability, and rolling blunder rates.
+- **Supabase Migration 000005** (`supabase/migrations/20261104000005_phase5_insight.sql`): Added `mistake_tag_summary` view and GIN indexing on mistake tags.
+- **ADR-0010**: Documented Architecture Decision Record for mistake tagging heuristics and diagnostic thresholds.
 
 ---
 

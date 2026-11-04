@@ -20,6 +20,7 @@ import { EvalGraph } from "./components/EvalGraph";
 import { TrainingDesk } from "./components/TrainingDesk";
 import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
+import { AnalyticsView } from "./components/AnalyticsView";
 import { useAuth } from "./lib/auth";
 import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
@@ -458,7 +459,13 @@ function App() {
             onRefreshData={refreshGames}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && (
+        {page === "Analytics" && (
+          <AnalyticsView
+            userId={user?.id}
+            totalGamesCount={games.length}
+          />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>

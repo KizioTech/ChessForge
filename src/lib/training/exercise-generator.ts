@@ -22,6 +22,7 @@ import type {
   ExerciseDifficulty
 } from "./types";
 import { getMoverWinProbability, calculateWinProbability } from "../engine/win-probability";
+import { tagMistake } from "../insight/mistake-tagger";
 
 export interface ExerciseGenerationInput {
   game: GameRecord;
@@ -106,6 +107,18 @@ export function generateExercisesFromGame({
       const posAfter = positions.find(p => p.ply === report.ply);
 
       if (posBefore && posAfter) {
+        const tagging = tagMistake({
+          fenBefore: posBefore.fen,
+          fenAfter: posAfter.fen,
+          playedUci: report.playedUci,
+          playedSan: report.playedSan,
+          bestUci: report.bestUci,
+          bestSan: report.bestSan,
+          pvLines: posBefore.pv_lines as CandidateLine[],
+          classification: report.classification,
+          winPctLoss: report.loss
+        });
+
         allMistakes.push({
           id: `mistake-${game.id}-${report.ply}`,
           user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
@@ -119,7 +132,8 @@ export function generateExercisesFromGame({
           win_pct_loss: report.loss,
           best_uci: report.bestUci,
           best_san: report.bestSan,
-          tags: [],
+          tags: tagging.tags,
+          tag_confidence: tagging.confidence,
           user_corrected: false
         });
       }
