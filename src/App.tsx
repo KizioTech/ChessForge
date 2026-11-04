@@ -326,21 +326,27 @@ function App() {
     setSelected(null);
   }
 
-  // Keyboard shortcuts: ← / → navigate, Ctrl+Z undo
+  // Keyboard shortcuts: ← / → navigate, Home/End, F flip, Ctrl+Z undo
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       // Don't fire when typing in an input / textarea
       const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); undoMove(); }
+        return;
+      }
 
       if (e.key === "ArrowLeft")  { e.preventDefault(); goToMove(historyIndex - 1); }
-      if (e.key === "ArrowRight") { e.preventDefault(); goToMove(historyIndex + 1); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); undoMove(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); goToMove(historyIndex + 1); }
+      else if (e.key === "Home") { e.preventDefault(); goToMove(0); }
+      else if (e.key === "End") { e.preventDefault(); goToMove(history.length); }
+      else if (e.key === "f" || e.key === "F") { setOrientation((prev: string) => (prev === "white" ? "black" : "white")); }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyIndex, moves]);
+  }, [historyIndex, moves, history.length]);
 
   const movePairs = [];
   for (let i=0; i<history.length; i+=2) movePairs.push({ n: i/2+1, white: history[i], black: history[i+1] });
@@ -771,116 +777,114 @@ function Analysis({
           </div>
         )}
 
-        {/* Top player above board (Left-aligned) */}
-        {(() => {
-          const topIsBlack = orientation === "white";
-          const topColor = topIsBlack ? "b" : "w";
-          const topName = activeGame ? (topIsBlack ? activeGame.black : activeGame.white) : (topIsBlack ? "Black" : "White");
-          const topElo = activeGame ? (topIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
-          const topIsUser = activeGame?.user_colour ? (topIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
+        <div className="board-wrapper">
+          {/* Top player above board (Left-aligned) */}
+          {(() => {
+            const topIsBlack = orientation === "white";
+            const topColor = topIsBlack ? "b" : "w";
+            const topName = activeGame ? (topIsBlack ? activeGame.black : activeGame.white) : (topIsBlack ? "Black" : "White");
+            const topElo = activeGame ? (topIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
+            const topIsUser = activeGame?.user_colour ? (topIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
 
-          return (
-            <div
-              className="board-player-tag board-player-top"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                maxWidth: "588px",
-                margin: "0 auto",
-                padding: "4px 0 8px 28px",
-                width: "100%",
-                boxSizing: "border-box"
-              }}
-            >
+            return (
               <div
-                className={`player-avatar ${topColor === "w" ? "white-avatar" : "black-avatar"}`}
-                style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                className="board-player-tag board-player-top"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "4px 0 8px 28px",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
               >
-                {topColor === "w" ? "W" : "B"}
+                <div
+                  className={`player-avatar ${topColor === "w" ? "white-avatar" : "black-avatar"}`}
+                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                >
+                  {topColor === "w" ? "W" : "B"}
+                </div>
+                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{topName}</strong>
+                {topElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({topElo})</span>}
+                {topIsUser && (
+                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                    YOU
+                  </span>
+                )}
               </div>
-              <strong style={{ fontSize: "12px", fontWeight: 600 }}>{topName}</strong>
-              {topElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({topElo})</span>}
-              {topIsUser && (
-                <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
-                  YOU
-                </span>
-              )}
-            </div>
-          );
-        })()}
+            );
+          })()}
 
-        {/* Board and evaluation rail */}
-        <div className="board-stage">
-          <EvaluationRail value={evalValue} />
-          <BoardView game={game} orientation={orientation} onMove={onMove} />
-        </div>
+          {/* Board and evaluation rail */}
+          <div className="board-stage">
+            <EvaluationRail value={evalValue} />
+            <BoardView game={game} orientation={orientation} onMove={onMove} />
+          </div>
 
-        {/* Bottom player below board (Left-aligned) */}
-        {(() => {
-          const bottomIsBlack = orientation !== "white";
-          const bottomColor = bottomIsBlack ? "b" : "w";
-          const bottomName = activeGame ? (bottomIsBlack ? activeGame.black : activeGame.white) : (bottomIsBlack ? "Black" : "White");
-          const bottomElo = activeGame ? (bottomIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
-          const bottomIsUser = activeGame?.user_colour ? (bottomIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
+          {/* Bottom player below board (Left-aligned) */}
+          {(() => {
+            const bottomIsBlack = orientation !== "white";
+            const bottomColor = bottomIsBlack ? "b" : "w";
+            const bottomName = activeGame ? (bottomIsBlack ? activeGame.black : activeGame.white) : (bottomIsBlack ? "Black" : "White");
+            const bottomElo = activeGame ? (bottomIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
+            const bottomIsUser = activeGame?.user_colour ? (bottomIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
 
-          return (
-            <div
-              className="board-player-tag board-player-bottom"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                maxWidth: "588px",
-                margin: "0 auto",
-                padding: "8px 0 4px 28px",
-                width: "100%",
-                boxSizing: "border-box"
-              }}
-            >
+            return (
               <div
-                className={`player-avatar ${bottomColor === "w" ? "white-avatar" : "black-avatar"}`}
-                style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                className="board-player-tag board-player-bottom"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 0 4px 28px",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
               >
-                {bottomColor === "w" ? "W" : "B"}
+                <div
+                  className={`player-avatar ${bottomColor === "w" ? "white-avatar" : "black-avatar"}`}
+                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                >
+                  {bottomColor === "w" ? "W" : "B"}
+                </div>
+                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{bottomName}</strong>
+                {bottomElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({bottomElo})</span>}
+                {bottomIsUser && (
+                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                    YOU
+                  </span>
+                )}
               </div>
-              <strong style={{ fontSize: "12px", fontWeight: 600 }}>{bottomName}</strong>
-              {bottomElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({bottomElo})</span>}
-              {bottomIsUser && (
-                <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
-                  YOU
-                </span>
-              )}
-            </div>
-          );
-        })()}
-        <div className="board-controls">
-          <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>
-          <button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move (←)"><ChevronLeft size={16}/></button>
-          <button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move (→)"><ChevronRight size={16}/></button>
-          <button className="icon-btn" onClick={()=>goToMove(history.length)} title="Go to end"><ArrowRight size={15}/></button>
-          <span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span>
-          <button
-            className="icon-btn"
-            onClick={onUndo}
-            disabled={history.length === 0}
-            title="Undo last move (Ctrl+Z)"
-            style={{ marginLeft: "auto", opacity: history.length === 0 ? 0.3 : 1 }}
-          >
-            <Undo2 size={15}/>
-          </button>
-          <button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button>
-        </div>
+            );
+          })()}
+          <div className="board-controls">
+            <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>
+            <button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move (←)"><ChevronLeft size={16}/></button>
+            <button className="icon-btn" onClick={()=>goToMove(historyIndex+1)} title="Next move (→)"><ChevronRight size={16}/></button>
+            <button className="icon-btn" onClick={()=>goToMove(history.length)} title="Go to end"><ArrowRight size={15}/></button>
+            <span className="move-position">{historyIndex===0?"Starting position":`After ${Math.ceil(historyIndex/2)}.${historyIndex%2?" White":" Black"}`}</span>
+            <button
+              className="icon-btn"
+              onClick={onUndo}
+              disabled={history.length === 0}
+              title="Undo last move (Ctrl+Z)"
+              style={{ marginLeft: "auto", opacity: history.length === 0 ? 0.3 : 1 }}
+            >
+              <Undo2 size={15}/>
+            </button>
+            <button className="icon-btn flip-btn" onClick={()=>setOrientation((prev: string)=>prev==="white"?"black":"white")} title="Flip board"><ArrowDownRight size={15}/></button>
+          </div>
 
-        {/* Evaluation Graph — shown below board controls once analysis is available */}
-        {analysisPositions.length > 1 && (
-          <EvalGraph
-            positions={analysisPositions}
-            currentPly={historyIndex}
-            onSelectPly={goToMove}
-            reports={moveReports}
-          />
-        )}
+          {/* Evaluation Graph — shown below board controls once analysis is available */}
+          {analysisPositions.length > 1 && (
+            <EvalGraph
+              positions={analysisPositions}
+              currentPly={historyIndex}
+              onSelectPly={goToMove}
+              reports={moveReports}
+            />
+          )}
+        </div>
       </section>
 
       <aside className="analysis-side">

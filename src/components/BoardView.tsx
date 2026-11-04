@@ -32,7 +32,7 @@ export function BoardView({
   orientation = "white",
   onMove,
   interactive = true,
-  maxWidth = "560px"
+  maxWidth = "100%"
 }: BoardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cgRef = useRef<Api | null>(null);
@@ -116,6 +116,18 @@ export function BoardView({
       });
     }
   }, [game, orientation, interactive, handleMove]);
+
+  // Redraw Chessground on container resize (e.g. sidebar toggle or window resize)
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(() => {
+      cgRef.current?.redrawAll();
+    });
+    ro.observe(containerRef.current);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
 
   // Clean up on unmount
   useEffect(() => {
