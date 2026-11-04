@@ -15,6 +15,7 @@ import {
 import type { Page } from "../types";
 import type { User } from "@supabase/supabase-js";
 import type { UserProfile } from "../lib/auth";
+import logoUrl from "../assets/logo.png";
 
 interface SidebarProps {
   page: Page;
@@ -168,7 +169,7 @@ export function Sidebar({
         <div className="sidebar-foot" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <img
-              src="/logo.png"
+              src={logoUrl}
               alt="ChessForge logo"
               style={{ width: "15px", height: "15px", borderRadius: "3px", objectFit: "contain" }}
               onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}

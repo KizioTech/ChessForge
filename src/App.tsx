@@ -28,6 +28,7 @@ import { analyzeGame, computeMoveClassifications } from "./lib/engine/game-analy
 import { StockfishEngine } from "./lib/engine/stockfish-engine";
 import type { PositionEvaluation, PositionRecord, MoveAnalysisReport } from "./lib/engine/types";
 import { generateExercisesFromGame } from "./lib/training/exercise-generator";
+import logoUrl from "./assets/logo.png";
 import {
   saveGeneratedExercises,
   getTrainingStats,
@@ -356,7 +357,7 @@ function App() {
     <header className="titlebar">
       <div className="titlebar-brand">
         <img
-          src="/logo.png"
+          src={logoUrl}
           alt="ChessForge logo"
           style={{ width: "20px", height: "20px", borderRadius: "4px", objectFit: "contain" }}
           onError={(e) => {

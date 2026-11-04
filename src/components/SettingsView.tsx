@@ -20,6 +20,7 @@ import {
   applyTheme,
   type AppSettings
 } from "../lib/settings";
+import logoUrl from "../assets/logo.png";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "../lib/export";
 import type { GameRecord } from "../lib/games";
 
@@ -467,7 +468,7 @@ export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
             <div className="panel" style={{ padding: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
                 <img
-                  src="/logo.png"
+                  src={logoUrl}
                   alt="ChessForge Logo"
                   style={{ width: "54px", height: "54px", borderRadius: "10px", objectFit: "contain", background: "var(--raised)", padding: "4px" }}
                   onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
