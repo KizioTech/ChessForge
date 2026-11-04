@@ -12,6 +12,7 @@ interface BoardViewProps {
   orientation?: "white" | "black";
   onMove?: (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => void;
   interactive?: boolean;
+  maxWidth?: number | string;
 }
 
 function toDests(chess: Chess): Map<Key, Key[]> {
@@ -30,7 +31,8 @@ export function BoardView({
   game,
   orientation = "white",
   onMove,
-  interactive = true
+  interactive = true,
+  maxWidth = "440px"
 }: BoardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cgRef = useRef<Api | null>(null);
@@ -138,7 +140,7 @@ export function BoardView({
       style={{
         position: "relative",
         width: "100%",
-        maxWidth: "560px",
+        maxWidth: typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth,
         minWidth: "260px",
         aspectRatio: "1 / 1",
         display: "flex"
