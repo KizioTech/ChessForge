@@ -3,7 +3,7 @@ import { Chess, type Square } from "chess.js";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight,
   ArrowUpRight, BarChart3, BookOpen, Brain, CalendarClock, Check,
-  ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, CloudDownload,
+  ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CloudDownload,
   Command, Crosshair, Crown, Database, Download, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
@@ -12,6 +12,7 @@ import {
 import type { Page } from "./types";
 import { BoardView } from "./components/BoardView";
 import { AuthModal } from "./components/AuthModal";
+import { ProfileModal } from "./components/ProfileModal";
 import { ImportDialog } from "./components/ImportDialog";
 import { GameLibrary } from "./components/GameLibrary";
 import { Sidebar } from "./components/Sidebar";
@@ -117,6 +118,7 @@ function App() {
   }, []);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [orientation, setOrientation] = useState<"white" | "black">("white");
   const [page, setPage] = useState<Page>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -372,6 +374,7 @@ function App() {
         user={user}
         profile={profile}
         onOpenAuth={() => setShowAuthModal(true)}
+        onOpenProfile={() => setShowProfileModal(true)}
         onSignOut={signOut}
         isOpen={sidebarOpen}
       />
@@ -460,6 +463,13 @@ function App() {
       onNavigateToGames={() => setPage("My Games")}
     />
     <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+    <ProfileModal
+      isOpen={showProfileModal}
+      onClose={() => setShowProfileModal(false)}
+      user={user}
+      profile={profile}
+      onSignOut={signOut}
+    />
   </div>;
 }
 
@@ -783,30 +793,6 @@ function Analysis({
       </div>
     )}
 
-    <div className="analysis-meta panel">
-      <div className="player">
-        <div className="player-avatar white-avatar">W</div>
-        <div>
-          <strong>{activeGame ? activeGame.white : "White"}</strong>
-          <span>{activeGame ? (activeGame.white_elo ? `${activeGame.white_elo} Elo` : "Unrated") : "Free position"}</span>
-        </div>
-      </div>
-      <span className="versus">VS</span>
-      <div className="player">
-        <div className="player-avatar black-avatar">B</div>
-        <div>
-          <strong>{activeGame ? activeGame.black : "Black"}</strong>
-          <span>{activeGame ? (activeGame.black_elo ? `${activeGame.black_elo} Elo` : "Unrated") : "Free position"}</span>
-        </div>
-      </div>
-      <div className="meta-divider"/>
-      <div className="meta-item"><Clock3 size={14}/> {activeGame ? `${activeGame.time_class || "Game"} · ${activeGame.time_control || "No clock"}` : "Untimed"}</div>
-      <div className="meta-item"><CalendarClock size={14}/> {activeGame ? (activeGame.played_at ? new Date(activeGame.played_at).toLocaleDateString() : (activeGame.termination || "Finished")) : "Local board"}</div>
-      <span className="sample-label" style={{ color: activeGame ? "var(--lime)" : "var(--muted)", fontWeight: activeGame ? 600 : 400 }}>
-        {activeGame ? (activeGame.user_colour && activeGame.user_colour !== "unknown" ? `YOU PLAYED ${activeGame.user_colour.toUpperCase()}` : activeGame.result) : "FREE ANALYSIS"}
-      </span>
-    </div>
-
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline">
@@ -847,7 +833,84 @@ function Analysis({
           </div>
         )}
 
-        <div className="board-stage"><EvaluationRail value={evalValue}/><BoardView game={game} orientation={orientation} onMove={onMove}/></div>
+        {/* Board with players at top-left and bottom-left */}
+        {(() => {
+          const topIsBlack = orientation === "white";
+          const topColor = topIsBlack ? "b" : "w";
+          const topName = activeGame ? (topIsBlack ? activeGame.black : activeGame.white) : (topIsBlack ? "Black" : "White");
+          const topElo = activeGame ? (topIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
+          const topIsUser = activeGame?.user_colour ? (topIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
+
+          const bottomIsBlack = orientation !== "white";
+          const bottomColor = bottomIsBlack ? "b" : "w";
+          const bottomName = activeGame ? (bottomIsBlack ? activeGame.black : activeGame.white) : (bottomIsBlack ? "Black" : "White");
+          const bottomElo = activeGame ? (bottomIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
+          const bottomIsUser = activeGame?.user_colour ? (bottomIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
+
+          return (
+            <div className="board-stage-wrapper" style={{ display: "flex", flexDirection: "column", maxWidth: "600px", margin: "0 auto" }}>
+              {/* Top Player (Left aligned) */}
+              <div
+                className="board-player-tag board-player-top"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "4px 0 8px 28px",
+                  fontSize: "12px",
+                  color: "var(--text)"
+                }}
+              >
+                <div
+                  className={`player-avatar ${topColor === "w" ? "white-avatar" : "black-avatar"}`}
+                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                >
+                  {topColor === "w" ? "W" : "B"}
+                </div>
+                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{topName}</strong>
+                {topElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({topElo})</span>}
+                {topIsUser && (
+                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                    YOU
+                  </span>
+                )}
+              </div>
+
+              {/* Board Stage */}
+              <div className="board-stage">
+                <EvaluationRail value={evalValue} />
+                <BoardView game={game} orientation={orientation} onMove={onMove} />
+              </div>
+
+              {/* Bottom Player (Left aligned) */}
+              <div
+                className="board-player-tag board-player-bottom"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 0 4px 28px",
+                  fontSize: "12px",
+                  color: "var(--text)"
+                }}
+              >
+                <div
+                  className={`player-avatar ${bottomColor === "w" ? "white-avatar" : "black-avatar"}`}
+                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+                >
+                  {bottomColor === "w" ? "W" : "B"}
+                </div>
+                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{bottomName}</strong>
+                {bottomElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({bottomElo})</span>}
+                {bottomIsUser && (
+                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                    YOU
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         <div className="board-controls">
           <button className="icon-btn" onClick={()=>goToMove(0)} title="Go to start (Home)"><ArrowLeft size={15}/></button>
           <button className="icon-btn" onClick={()=>goToMove(historyIndex-1)} title="Previous move (←)"><ChevronLeft size={16}/></button>
