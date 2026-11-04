@@ -165,8 +165,16 @@ export function Sidebar({
           <Settings2 size={16} />
           <span>Settings</span>
         </button>
-        <div className="sidebar-foot">
-          <span>CHESSFORGE</span>
+        <div className="sidebar-foot" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <img
+              src="/logo.png"
+              alt="ChessForge logo"
+              style={{ width: "15px", height: "15px", borderRadius: "3px", objectFit: "contain" }}
+              onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+            />
+            <span>CHESSFORGE</span>
+          </div>
           <span className="version-pill" style={{
             fontSize: "9px",
             background: "rgba(183, 227, 106, 0.12)",

@@ -41,5 +41,18 @@
   "allowScripts": {
     "electron@33.4.11": true,
     "esbuild@0.25.12": true
+  },
+  "build": {
+    "appId": "com.kiziotech.chessforge",
+    "productName": "ChessForge",
+    "win": {
+      "icon": "public/logo.ico"
+    },
+    "mac": {
+      "icon": "public/logo.png"
+    },
+    "linux": {
+      "icon": "public/logo.png"
+    }
   }
 }
