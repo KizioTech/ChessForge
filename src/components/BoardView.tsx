@@ -133,7 +133,17 @@ export function BoardView({
   }
 
   return (
-    <div className="board-container" style={{ position: "relative", width: "100%", maxWidth: "560px", aspectRatio: "1" }}>
+    <div
+      className="board-container"
+      style={{
+        position: "relative",
+        width: "100%",
+        maxWidth: "560px",
+        minWidth: "260px",
+        aspectRatio: "1 / 1",
+        display: "flex"
+      }}
+    >
       <div
         ref={containerRef}
         style={{

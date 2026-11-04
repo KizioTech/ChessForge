@@ -833,7 +833,7 @@ function Analysis({
           </div>
         )}
 
-        {/* Board with players at top-left and bottom-left */}
+        {/* Top player above board (Left-aligned) */}
         {(() => {
           const topIsBlack = orientation === "white";
           const topColor = topIsBlack ? "b" : "w";
@@ -841,6 +841,45 @@ function Analysis({
           const topElo = activeGame ? (topIsBlack ? activeGame.black_elo : activeGame.white_elo) : null;
           const topIsUser = activeGame?.user_colour ? (topIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
 
+          return (
+            <div
+              className="board-player-tag board-player-top"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                maxWidth: "588px",
+                margin: "0 auto",
+                padding: "4px 0 8px 28px",
+                width: "100%",
+                boxSizing: "border-box"
+              }}
+            >
+              <div
+                className={`player-avatar ${topColor === "w" ? "white-avatar" : "black-avatar"}`}
+                style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
+              >
+                {topColor === "w" ? "W" : "B"}
+              </div>
+              <strong style={{ fontSize: "12px", fontWeight: 600 }}>{topName}</strong>
+              {topElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({topElo})</span>}
+              {topIsUser && (
+                <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                  YOU
+                </span>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Board and evaluation rail */}
+        <div className="board-stage">
+          <EvaluationRail value={evalValue} />
+          <BoardView game={game} orientation={orientation} onMove={onMove} />
+        </div>
+
+        {/* Bottom player below board (Left-aligned) */}
+        {(() => {
           const bottomIsBlack = orientation !== "white";
           const bottomColor = bottomIsBlack ? "b" : "w";
           const bottomName = activeGame ? (bottomIsBlack ? activeGame.black : activeGame.white) : (bottomIsBlack ? "Black" : "White");
@@ -848,66 +887,32 @@ function Analysis({
           const bottomIsUser = activeGame?.user_colour ? (bottomIsBlack ? activeGame.user_colour === "black" : activeGame.user_colour === "white") : false;
 
           return (
-            <div className="board-stage-wrapper" style={{ display: "flex", flexDirection: "column", maxWidth: "600px", margin: "0 auto" }}>
-              {/* Top Player (Left aligned) */}
+            <div
+              className="board-player-tag board-player-bottom"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                maxWidth: "588px",
+                margin: "0 auto",
+                padding: "8px 0 4px 28px",
+                width: "100%",
+                boxSizing: "border-box"
+              }}
+            >
               <div
-                className="board-player-tag board-player-top"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "4px 0 8px 28px",
-                  fontSize: "12px",
-                  color: "var(--text)"
-                }}
+                className={`player-avatar ${bottomColor === "w" ? "white-avatar" : "black-avatar"}`}
+                style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
               >
-                <div
-                  className={`player-avatar ${topColor === "w" ? "white-avatar" : "black-avatar"}`}
-                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
-                >
-                  {topColor === "w" ? "W" : "B"}
-                </div>
-                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{topName}</strong>
-                {topElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({topElo})</span>}
-                {topIsUser && (
-                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
-                    YOU
-                  </span>
-                )}
+                {bottomColor === "w" ? "W" : "B"}
               </div>
-
-              {/* Board Stage */}
-              <div className="board-stage">
-                <EvaluationRail value={evalValue} />
-                <BoardView game={game} orientation={orientation} onMove={onMove} />
-              </div>
-
-              {/* Bottom Player (Left aligned) */}
-              <div
-                className="board-player-tag board-player-bottom"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 0 4px 28px",
-                  fontSize: "12px",
-                  color: "var(--text)"
-                }}
-              >
-                <div
-                  className={`player-avatar ${bottomColor === "w" ? "white-avatar" : "black-avatar"}`}
-                  style={{ width: "22px", height: "22px", borderRadius: "5px", fontSize: "10px", fontWeight: 700 }}
-                >
-                  {bottomColor === "w" ? "W" : "B"}
-                </div>
-                <strong style={{ fontSize: "12px", fontWeight: 600 }}>{bottomName}</strong>
-                {bottomElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({bottomElo})</span>}
-                {bottomIsUser && (
-                  <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
-                    YOU
-                  </span>
-                )}
-              </div>
+              <strong style={{ fontSize: "12px", fontWeight: 600 }}>{bottomName}</strong>
+              {bottomElo && <span style={{ color: "var(--muted)", fontSize: "11px" }}>({bottomElo})</span>}
+              {bottomIsUser && (
+                <span style={{ fontSize: "9px", background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 600 }}>
+                  YOU
+                </span>
+              )}
             </div>
           );
         })()}

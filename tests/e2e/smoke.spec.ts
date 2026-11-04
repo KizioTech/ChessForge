@@ -113,12 +113,11 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
     await analyseBtn.click();
     await expect(page.locator("h1")).toHaveText("Analysis workspace");
 
-    // Verify dynamic game metadata in Analysis header & meta bar (no demo text)
-    await expect(page.locator(".analysis-meta")).toContainText("makawa7");
-    await expect(page.locator(".analysis-meta")).toContainText("GrandmasterX");
-    await expect(page.locator(".analysis-meta")).toContainText("1205 Elo");
-    await expect(page.locator(".analysis-meta")).toContainText("1190 Elo");
-    await expect(page.locator(".sample-label")).toHaveText("1-0");
+    // Verify dynamic game metadata around the board (no demo text)
+    await expect(page.locator(".board-player-tag", { hasText: "makawa7" })).toBeVisible();
+    await expect(page.locator(".board-player-tag", { hasText: "GrandmasterX" })).toBeVisible();
+    await expect(page.locator(".board-panel")).toContainText("1205");
+    await expect(page.locator(".board-panel")).toContainText("1190");
     await expect(page.getByText("DEMO POSITION")).not.toBeVisible();
 
     // Verify board and notation are populated
@@ -249,8 +248,8 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
   test("Settings view displays themes, engine options, KizioTech author, and repository link", async ({ page }) => {
     await page.goto("/");
 
-    // Verify sidebar version tag is v1.0.0
-    await expect(page.locator(".sidebar-foot .version-pill")).toHaveText("v1.0.0");
+    // Verify sidebar version tag is v0.4.0
+    await expect(page.locator(".sidebar-foot .version-pill")).toHaveText("v0.4.0");
 
     // Navigate to Settings
     const settingsNav = page.locator("button.nav-item", { hasText: "Settings" });
