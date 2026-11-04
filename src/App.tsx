@@ -465,6 +465,9 @@ function App() {
           <AnalyticsView
             userId={user?.id}
             totalGamesCount={games.length}
+            games={games}
+            onOpenAnalysis={openAnalysisForGame}
+            onNavigateToTrain={() => setPage("Train")}
           />
         )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && (

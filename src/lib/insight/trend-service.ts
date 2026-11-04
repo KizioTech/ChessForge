@@ -34,6 +34,7 @@ export interface WeaknessAnalysisReport {
   rollingTrends: RollingTrendPoint[];
   timeTroubleCount: number;
   timeTroublePercentage: number;
+  mistakes: MistakeRecord[];
 }
 
 const LS_MISTAKES = "chessforge:mistakes";
@@ -133,7 +134,8 @@ export function computeWeaknessAnalysis(
     tagFrequencies,
     rollingTrends,
     timeTroubleCount,
-    timeTroublePercentage
+    timeTroublePercentage,
+    mistakes
   };
 }
 
