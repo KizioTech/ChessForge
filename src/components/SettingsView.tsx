@@ -485,7 +485,7 @@ export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
                       borderRadius: "10px",
                       fontWeight: 600
                     }}>
-                      v0.4.0
+                      v0.5.0
                     </span>
                   </div>
                   <span style={{ fontSize: "12px", color: "var(--muted)" }}>

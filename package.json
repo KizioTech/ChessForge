@@ -1,6 +1,6 @@
 {
   "name": "chessforge",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "A personal chess improvement desktop workspace",
   "main": "dist-electron/main.js",

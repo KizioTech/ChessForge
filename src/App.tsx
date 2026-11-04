@@ -36,6 +36,7 @@ import {
   type TrainingStats
 } from "./lib/training/training-service";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "./lib/export";
+import { getWeaknessAnalysis, type WeaknessAnalysisReport } from "./lib/insight/trend-service";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -415,6 +416,7 @@ function App() {
             onNavigate={setPage}
             onImport={() => setShowImport(true)}
             onOpenAnalysis={openAnalysisForGame}
+            userId={user?.id}
           />
         )}
         {page === "My Games" && <GameLibrary games={games} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame} onDeleteGame={handleDeleteGame} />}
@@ -492,25 +494,39 @@ function Dashboard({
   trainingStats,
   onNavigate,
   onImport,
-  onOpenAnalysis
+  onOpenAnalysis,
+  userId
 }: {
   games: GameRecord[];
   trainingStats: TrainingStats;
   onNavigate: (p: Page) => void;
   onImport: () => void;
   onOpenAnalysis: (g: GameRecord) => void;
+  userId?: string;
 }) {
   const recentGames = games.slice(0, 3);
+  const [weakness, setWeakness] = useState<WeaknessAnalysisReport | null>(null);
+
+  useEffect(() => {
+    getWeaknessAnalysis(userId, games.length).then(setWeakness);
+  }, [userId, games.length]);
+
   return <div className="content dashboard-content">
     <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={13}/> YOUR TRAINING DESK</div><h1>Good afternoon.</h1><p className="subheading">A clearer picture of your chess. One decision at a time.</p></div><div className="date-chip"><CalendarClock size={14}/> Tuesday, 3 November 2026</div></div>
     <div className="stat-grid">
-      <StatCard label="CHESS.COM RAPID" value="1,205" change="Starting baseline" icon={<Gauge size={16}/>} tone="lime"/>
+      <StatCard
+        label="BLUNDERS / 100 MOVES"
+        value={weakness ? `${weakness.blundersPer100Moves}` : `${trainingStats.blundersPer100Moves || "—"}`}
+        change={weakness && weakness.totalMistakes > 0 ? `${weakness.totalMistakes} logged mistakes` : "Evaluate games to track"}
+        icon={<Gauge size={16}/>}
+        tone={weakness && weakness.blundersPer100Moves > 3 ? undefined : "lime"}
+      />
       <StatCard
         label="GAMES IN LIBRARY"
         value={games.length > 0 ? `${games.length}` : "—"}
-        change={games.length > 0 ? "Ready for review" : "Import games to begin"}
+        change={games.length >= 20 ? "Baseline sample met" : `${games.length}/20 baseline games`}
         icon={<Activity size={16}/>}
-        tone={games.length > 0 ? "lime" : undefined}
+        tone={games.length >= 20 ? "lime" : undefined}
       />
       <StatCard
         label="REVIEW POSITIONS"
@@ -538,12 +554,48 @@ function Dashboard({
         </div>
       </section>
       <section className="panel focus-panel">
-        <div className="panel-head"><div><div className="eyebrow">YOUR FOCUS</div><h2>What we know so far</h2></div><button className="icon-btn"><MoreHorizontal size={17}/></button></div>
-        {games.length >= 20 ? (
+        <div className="panel-head"><div><div className="eyebrow">YOUR FOCUS</div><h2>Weakness Diagnosis</h2></div><button className="icon-btn" onClick={()=>onNavigate("Analytics")} title="Open full analytics view"><BarChart3 size={17}/></button></div>
+        {weakness && weakness.totalMistakes > 0 ? (
+          <div className="empty-insight" style={{ textAlign: "left", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+              <div className="insight-icon" style={{ margin: 0 }}><Brain size={19}/></div>
+              <strong style={{ fontSize: "14px" }}>
+                {weakness.tagFrequencies[0]?.tag
+                  ? `Primary blindspot: ${weakness.tagFrequencies[0].tag.replace(/_/g, " ")}`
+                  : "Tactical patterns identified"}
+              </strong>
+            </div>
+            <p style={{ margin: "4px 0 10px", fontSize: "12px", lineHeight: "1.4" }}>
+              {weakness.insufficientData
+                ? `Preliminary data from ${games.length}/20 baseline games (${weakness.totalMistakes} mistakes detected).`
+                : `Verified across ${games.length} games. ${weakness.tagFrequencies[0]?.count || 0} occurrences (${weakness.tagFrequencies[0]?.percentage || 0}% of mistakes).`}
+            </p>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+              {weakness.tagFrequencies.filter(t => t.count > 0).slice(0, 3).map(tf => (
+                <span
+                  key={tf.tag}
+                  style={{
+                    fontSize: "11px",
+                    padding: "3px 8px",
+                    borderRadius: "12px",
+                    background: "rgba(183, 227, 106, 0.12)",
+                    color: "var(--lime)",
+                    border: "1px solid rgba(183, 227, 106, 0.25)"
+                  }}
+                >
+                  {tf.tag.replace(/_/g, " ")} ({tf.count})
+                </span>
+              ))}
+            </div>
+            <button className="button button-primary button-small" onClick={()=>onNavigate("Analytics")}>
+              View Weakness Breakdown <ArrowRight size={13}/>
+            </button>
+          </div>
+        ) : games.length >= 20 ? (
           <div className="empty-insight">
             <div className="insight-icon"><Brain size={19}/></div>
             <strong>{games.length} games imported!</strong>
-            <p>Baseline sample met. In Phase 3, Stockfish engine analysis will evaluate these games to diagnose your recurring errors.</p>
+            <p>Baseline sample met. Analyse your games in the Analysis tab to automatically identify tactical blindspots.</p>
             <button className="text-button" onClick={()=>onNavigate("My Games")}>Explore your games <ArrowRight size={13}/></button>
           </div>
         ) : (
@@ -554,7 +606,7 @@ function Dashboard({
             <button className="text-button" onClick={onImport}>{games.length > 0 ? "Import more games" : "Import your first games"} <ArrowRight size={13}/></button>
           </div>
         )}
-        <div className="focus-footer"><ShieldCheck size={14}/> Recommendations will be based on your own games.</div>
+        <div className="focus-footer"><ShieldCheck size={14}/> Evidence over assumptions: Requires N &ge; 20 games for verified diagnosis.</div>
       </section>
       <section className="panel performance-panel">
         <div className="panel-head"><div><div className="eyebrow">PERFORMANCE</div><h2>Rating & consistency</h2></div><button className="select-button">Last 30 days <ChevronDown size={13}/></button></div>
@@ -743,6 +795,8 @@ function Analysis({
     if ("pv_lines" in currentEval && Array.isArray((currentEval as any).pv_lines)) return (currentEval as any).pv_lines;
     return [];
   }, [currentEval]);
+
+  const currentReport = reportByPly[historyIndex];
 
   return <div className="analysis-content">
     <div className="analysis-layout">
@@ -1043,7 +1097,46 @@ function Analysis({
             </div>)}</div>}
         </section>
 
-        <section className="panel lesson-panel"><div className="panel-head"><div><div className="eyebrow">LEARNING NOTES</div><h2>What to look for</h2></div><Brain size={16} className="muted"/></div><div className="lesson-empty"><Sparkles size={15}/><span>After engine analysis, ChessForge will explain critical moments and suggest positions worth practising.</span></div></section>
+        <section className="panel lesson-panel">
+          <div className="panel-head"><div><div className="eyebrow">LEARNING NOTES</div><h2>What to look for</h2></div><Brain size={16} className="muted"/></div>
+          {currentReport?.tags && currentReport.tags.length > 0 ? (
+            <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="badge-blunder" style={{ padding: "2px 6px", fontSize: "11px" }}>
+                  {currentReport.classification.toUpperCase()}
+                </span>
+                <strong style={{ fontSize: "12px", color: "var(--text)" }}>Tactical Diagnosis</strong>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                {currentReport.tags.map(t => (
+                  <span
+                    key={t}
+                    style={{
+                      fontSize: "11px",
+                      padding: "3px 8px",
+                      borderRadius: "6px",
+                      background: "rgba(183, 227, 106, 0.12)",
+                      color: "var(--lime)",
+                      border: "1px solid rgba(183, 227, 106, 0.25)",
+                      fontWeight: 500
+                    }}
+                  >
+                    {t.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--muted)", lineHeight: 1.4 }}>
+                Loss of {currentReport.loss}% win probability. Recommended move was{" "}
+                <b style={{ color: "var(--text)" }}>{currentReport.bestSan || currentReport.bestUci}</b>.
+              </p>
+            </div>
+          ) : (
+            <div className="lesson-empty">
+              <Sparkles size={15}/>
+              <span>After engine analysis, ChessForge will explain critical moments, tag recurring tactical blindspots, and suggest positions worth practising.</span>
+            </div>
+          )}
+        </section>
 
         {/* Footnote at the bottom of the scrollable right panel */}
         <div className="analysis-footnote"><ShieldCheck size={13}/> Engine analysis is for post-game review only. No live-game assistance is ever provided.</div>

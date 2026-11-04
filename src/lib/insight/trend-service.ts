@@ -166,3 +166,4 @@ export async function getWeaknessAnalysis(
     return computeWeaknessAnalysis(localMistakes, totalGamesCount, totalMovesCount);
   }
 }
+

@@ -49,6 +49,7 @@ export interface MoveAnalysisReport {
   evalAfter: number; // win prob (0-100) after move from mover's perspective
   loss: number; // percentage loss in win probability (0-100)
   classification: MoveClassification;
+  tags?: string[];
 }
 
 export interface GameAnalysisRecord {

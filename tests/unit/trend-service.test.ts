@@ -63,3 +63,4 @@ describe("Phase 5: Weakness & Trend Service", () => {
     expect(report.tagFrequencies.find(t => t.tag === "back_rank_weakness")?.count).toBe(1);
   });
 });
+

@@ -38,3 +38,4 @@ Furthermore, Core Principle #3 dictates "Evidence Over Assumptions": longitudina
 - Fast client-side evaluation without requiring external ML models or server round-trips.
 - Consistent with offline-first architecture (dual-layer Supabase + LocalStorage).
 - Users receive clear feedback on recurring patterns rather than unclassified errors.
+

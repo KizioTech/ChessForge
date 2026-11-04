@@ -260,3 +260,4 @@ export function AnalyticsView({ userId, totalGamesCount }: AnalyticsViewProps) {
     </div>
   );
 }
+

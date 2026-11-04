@@ -18,3 +18,4 @@ group by
 -- 2. Add an index to speed up mistake tag queries
 create index if not exists idx_mistakes_tags on public.mistakes using gin(tags);
 create index if not exists idx_mistakes_created_at on public.mistakes(created_at);
+
