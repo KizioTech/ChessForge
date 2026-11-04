@@ -1,16 +1,19 @@
-import React from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   Activity,
   BarChart3,
   BookOpen,
   CalendarClock,
+  ChevronDown,
   Crosshair,
   Crown,
   FolderOpen,
   LayoutDashboard,
+  Link2,
   LogIn,
   LogOut,
-  Settings2
+  Settings2,
+  User as UserIcon
 } from "lucide-react";
 import type { Page } from "../types";
 import type { User } from "@supabase/supabase-js";
@@ -25,6 +28,201 @@ interface SidebarProps {
   onSignOut: () => void;
   isOpen?: boolean;
 }
+
+// ─── Profile popover ────────────────────────────────────────────────────────
+
+interface ProfilePopoverProps {
+  user: User;
+  profile: UserProfile | null;
+  onSignOut: () => void;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function ProfilePopover({ user, profile, onSignOut, onClose, anchorRef }: ProfilePopoverProps) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Pull stored extras from profile.settings (graceful defaults)
+  const stored = (profile?.settings ?? {}) as Record<string, string>;
+  const [lichessRating, setLichessRating] = useState<string>(stored.lichess_rating ?? "");
+  const [chesscomHandle, setChesscomHandle] = useState<string>(stored.chesscom_handle ?? "");
+
+  const userInitials = (profile?.display_name || user.email || "")
+    .slice(0, 2)
+    .toUpperCase();
+  const displayName = profile?.display_name || user.email?.split("@")[0] || "Account";
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose, anchorRef]);
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const row: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px"
+  };
+  const label: React.CSSProperties = {
+    fontSize: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.6px",
+    color: "var(--muted)",
+    fontWeight: 600
+  };
+  const input: React.CSSProperties = {
+    background: "var(--raised)",
+    border: "1px solid var(--line)",
+    borderRadius: "6px",
+    color: "var(--text)",
+    fontSize: "12px",
+    padding: "5px 8px",
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box"
+  };
+
+  return (
+    <div
+      ref={popoverRef}
+      role="dialog"
+      aria-label="Profile"
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 8px)",
+        left: "0",
+        right: "0",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: "10px",
+        padding: "16px",
+        zIndex: 200,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px"
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "var(--lime)",
+            color: "var(--bg)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: 700,
+            fontSize: "14px",
+            flexShrink: 0
+          }}
+        >
+          {userInitials || <UserIcon size={16} />}
+        </div>
+        <div style={{ overflow: "hidden" }}>
+          <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {displayName}
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {user.email}
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: "1px solid var(--line)" }} />
+
+      {/* Connected accounts / ratings */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+          <Link2 size={12} style={{ color: "var(--muted)" }} />
+          <span style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--muted)", fontWeight: 600 }}>
+            Connected Accounts
+          </span>
+        </div>
+
+        <div style={row}>
+          <span style={label}>Lichess Rating</span>
+          <input
+            type="number"
+            min="400"
+            max="3500"
+            placeholder="e.g. 1450"
+            value={lichessRating}
+            onChange={e => setLichessRating(e.target.value)}
+            style={input}
+          />
+        </div>
+
+        <div style={row}>
+          <span style={label}>Chess.com Username</span>
+          <input
+            type="text"
+            placeholder="your-handle"
+            value={chesscomHandle}
+            onChange={e => setChesscomHandle(e.target.value)}
+            style={input}
+          />
+        </div>
+
+        <p style={{ fontSize: "10px", color: "var(--muted)", margin: 0 }}>
+          Saved locally · OAuth sync coming in a future release
+        </p>
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: "1px solid var(--line)" }} />
+
+      {/* Sign out */}
+      <button
+        onClick={onSignOut}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          background: "none",
+          border: "1px solid var(--line)",
+          borderRadius: "7px",
+          color: "var(--text)",
+          fontSize: "12px",
+          cursor: "pointer",
+          padding: "7px 10px",
+          width: "100%",
+          transition: "background 0.15s"
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,80,80,0.08)")}
+        onMouseLeave={e => (e.currentTarget.style.background = "none")}
+      >
+        <LogOut size={13} style={{ color: "var(--muted)" }} />
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+// ─── Nav groups ─────────────────────────────────────────────────────────────
 
 const navGroups = [
   {
@@ -52,6 +250,8 @@ const navGroups = [
   }
 ];
 
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+
 export function Sidebar({
   page,
   onNavigate,
@@ -61,6 +261,9 @@ export function Sidebar({
   onSignOut,
   isOpen = true
 }: SidebarProps) {
+  const [showProfile, setShowProfile] = useState(false);
+  const profileAnchorRef = useRef<HTMLDivElement>(null);
+
   if (!isOpen) return null;
 
   const userInitials = (profile?.display_name || user?.email || "")
@@ -73,35 +276,50 @@ export function Sidebar({
     <aside className="sidebar" aria-label="Main Navigation">
       {/* Profile / Sign-In area */}
       {user ? (
-        <div className="profile-switcher" style={{ cursor: "default" }}>
-          <div className="profile-avatar">{userInitials}</div>
-          <div className="profile-copy">
-            <strong>{userDisplayName}</strong>
-            <span style={{ fontSize: "11px", color: "var(--muted)" }}>{user.email}</span>
-          </div>
-          <button
-            onClick={onSignOut}
-            title="Sign out"
-            style={{
-              marginLeft: "auto",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--muted)",
-              display: "flex",
-              alignItems: "center",
-              padding: "4px",
-              borderRadius: "4px"
-            }}
+        <div style={{ position: "relative" }}>
+          <div
+            ref={profileAnchorRef}
+            className="profile-switcher"
+            onClick={() => setShowProfile(v => !v)}
+            onKeyDown={e => e.key === "Enter" && setShowProfile(v => !v)}
+            style={{ cursor: "pointer" }}
+            role="button"
+            tabIndex={0}
+            aria-expanded={showProfile}
+            aria-haspopup="dialog"
+            aria-label="Open profile"
           >
-            <LogOut size={14} />
-          </button>
+            <div className="profile-avatar">{userInitials}</div>
+            <div className="profile-copy">
+              <strong>{userDisplayName}</strong>
+              <span style={{ fontSize: "11px", color: "var(--muted)" }}>{user.email}</span>
+            </div>
+            <ChevronDown
+              size={14}
+              style={{
+                marginLeft: "auto",
+                color: "var(--muted)",
+                transform: showProfile ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s"
+              }}
+            />
+          </div>
+
+          {showProfile && (
+            <ProfilePopover
+              user={user}
+              profile={profile}
+              onSignOut={() => { setShowProfile(false); onSignOut(); }}
+              onClose={() => setShowProfile(false)}
+              anchorRef={profileAnchorRef}
+            />
+          )}
         </div>
       ) : (
         <div
           className="profile-switcher"
           onClick={onOpenAuth}
-          onKeyDown={(e) => e.key === "Enter" && onOpenAuth()}
+          onKeyDown={e => e.key === "Enter" && onOpenAuth()}
           style={{ cursor: "pointer" }}
           role="button"
           tabIndex={0}
@@ -183,4 +401,3 @@ export function Sidebar({
     </aside>
   );
 }
-

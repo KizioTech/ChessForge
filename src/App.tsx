@@ -7,7 +7,7 @@ import {
   Command, Crosshair, Crown, Database, Download, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
-  X, Zap, LogIn, LogOut, User as UserIcon, Undo2
+  X, Zap, Undo2
 } from "lucide-react";
 import type { Page } from "./types";
 import { BoardView } from "./components/BoardView";
@@ -343,10 +343,6 @@ function App() {
   const movePairs = [];
   for (let i=0; i<history.length; i+=2) movePairs.push({ n: i/2+1, white: history[i], black: history[i+1] });
 
-  const userInitials = (profile?.display_name || user?.email || "JM")
-    .slice(0, 2)
-    .toUpperCase();
-  const userDisplayName = profile?.display_name || user?.email?.split("@")[0] || "My ChessForge";
 
   return <div className="app-shell">
     <header className="titlebar">
@@ -363,11 +359,9 @@ function App() {
         <span className="brand-divider">/</span>
         <span className="titlebar-context">{page}</span>
       </div>
-      <div className="titlebar-center"><span className="status-dot"/> Personal workspace <span className="titlebar-sep">·</span> {user ? user.email : "Local session"}</div>
       <div className="titlebar-actions">
         <button className="icon-btn" title="Help"><CircleHelp size={15}/></button>
         <button className="icon-btn" title="Settings" onClick={() => setPage("Settings")}><Settings2 size={15}/></button>
-        <div className="avatar" title={user?.email || "Local session"}>{userInitials}</div>
       </div>
     </header>
 
