@@ -151,11 +151,11 @@ export function BoardView({
       className="board-container"
       style={{
         position: "relative",
-        width: "100%",
-        maxWidth: typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth,
-        minWidth: "260px",
+        height: "100%",
+        width: "auto",
         aspectRatio: "1 / 1",
-        display: "flex"
+        display: "flex",
+        flexShrink: 0
       }}
     >
       <div

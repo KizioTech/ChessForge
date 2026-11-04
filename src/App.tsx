@@ -737,7 +737,7 @@ function Analysis({
     return [];
   }, [currentEval]);
 
-  return <div className="content analysis-content">
+  return <div className="analysis-content">
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline">
@@ -794,9 +794,8 @@ function Analysis({
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "4px 0 8px 28px",
-                  width: "100%",
-                  boxSizing: "border-box"
+                  padding: "2px 0 6px 20px",
+                  flexShrink: 0
                 }}
               >
                 <div
@@ -837,9 +836,8 @@ function Analysis({
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "8px 0 4px 28px",
-                  width: "100%",
-                  boxSizing: "border-box"
+                  padding: "6px 0 2px 20px",
+                  flexShrink: 0
                 }}
               >
                 <div
@@ -878,12 +876,14 @@ function Analysis({
 
           {/* Evaluation Graph — shown below board controls once analysis is available */}
           {analysisPositions.length > 1 && (
-            <EvalGraph
-              positions={analysisPositions}
-              currentPly={historyIndex}
-              onSelectPly={goToMove}
-              reports={moveReports}
-            />
+            <div style={{ flexShrink: 0 }}>
+              <EvalGraph
+                positions={analysisPositions}
+                currentPly={historyIndex}
+                onSelectPly={goToMove}
+                reports={moveReports}
+              />
+            </div>
           )}
         </div>
       </section>
@@ -1037,9 +1037,11 @@ function Analysis({
         </section>
 
         <section className="panel lesson-panel"><div className="panel-head"><div><div className="eyebrow">LEARNING NOTES</div><h2>What to look for</h2></div><Brain size={16} className="muted"/></div><div className="lesson-empty"><Sparkles size={15}/><span>After engine analysis, ChessForge will explain critical moments and suggest positions worth practising.</span></div></section>
+
+        {/* Footnote at the bottom of the scrollable right panel */}
+        <div className="analysis-footnote"><ShieldCheck size={13}/> Engine analysis is for post-game review only. No live-game assistance is ever provided.</div>
       </aside>
     </div>
-    <div className="analysis-footnote"><ShieldCheck size={13}/> Engine analysis is for post-game review only. No live-game assistance is ever provided.</div>
   </div>;
 }
 
