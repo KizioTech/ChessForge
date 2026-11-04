@@ -4,11 +4,12 @@ import {
   BarChart3,
   BookOpen,
   CalendarClock,
-  ChevronDown,
   Crosshair,
   Crown,
   FolderOpen,
   LayoutDashboard,
+  LogIn,
+  LogOut,
   Settings2
 } from "lucide-react";
 import type { Page } from "../types";
@@ -21,6 +22,7 @@ interface SidebarProps {
   user: User | null;
   profile: UserProfile | null;
   onOpenAuth: () => void;
+  onSignOut: () => void;
   isOpen?: boolean;
 }
 
@@ -56,31 +58,72 @@ export function Sidebar({
   user,
   profile,
   onOpenAuth,
+  onSignOut,
   isOpen = true
 }: SidebarProps) {
   if (!isOpen) return null;
 
-  const userInitials = (profile?.display_name || user?.email || "JM")
+  const userInitials = (profile?.display_name || user?.email || "")
     .slice(0, 2)
     .toUpperCase();
-  const userDisplayName = profile?.display_name || user?.email?.split("@")[0] || "My ChessForge";
+  const userDisplayName =
+    profile?.display_name || user?.email?.split("@")[0] || "";
 
   return (
     <aside className="sidebar" aria-label="Main Navigation">
-      <div
-        className="profile-switcher"
-        onClick={() => !user && onOpenAuth()}
-        style={{ cursor: user ? "default" : "pointer" }}
-        role="button"
-        tabIndex={0}
-      >
-        <div className="profile-avatar">{userInitials}</div>
-        <div className="profile-copy">
-          <strong>{userDisplayName}</strong>
-          <span>{user ? user.email : "Personal account (sign in)"}</span>
+      {/* Profile / Sign-In area */}
+      {user ? (
+        <div className="profile-switcher" style={{ cursor: "default" }}>
+          <div className="profile-avatar">{userInitials}</div>
+          <div className="profile-copy">
+            <strong>{userDisplayName}</strong>
+            <span style={{ fontSize: "11px", color: "var(--muted)" }}>{user.email}</span>
+          </div>
+          <button
+            onClick={onSignOut}
+            title="Sign out"
+            style={{
+              marginLeft: "auto",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--muted)",
+              display: "flex",
+              alignItems: "center",
+              padding: "4px",
+              borderRadius: "4px"
+            }}
+          >
+            <LogOut size={14} />
+          </button>
         </div>
-        {!user && <ChevronDown size={14} className="muted" />}
-      </div>
+      ) : (
+        <div
+          className="profile-switcher"
+          onClick={onOpenAuth}
+          onKeyDown={(e) => e.key === "Enter" && onOpenAuth()}
+          style={{ cursor: "pointer" }}
+          role="button"
+          tabIndex={0}
+          aria-label="Sign in to ChessForge"
+        >
+          <div
+            className="profile-avatar"
+            style={{
+              background: "rgba(183, 227, 106, 0.08)",
+              color: "var(--lime)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <LogIn size={15} />
+          </div>
+          <div className="profile-copy">
+            <strong style={{ color: "var(--lime)" }}>Sign In</strong>
+          </div>
+        </div>
+      )}
 
       <div className="sidebar-nav-scroll">
         {navGroups.map(group => (
@@ -133,7 +176,7 @@ export function Sidebar({
             fontWeight: 600,
             letterSpacing: "0.5px"
           }}>
-            v1.0.0
+            v0.4.0
           </span>
         </div>
       </div>

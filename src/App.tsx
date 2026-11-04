@@ -365,15 +365,6 @@ function App() {
       </div>
       <div className="titlebar-center"><span className="status-dot"/> Personal workspace <span className="titlebar-sep">·</span> {user ? user.email : "Local session"}</div>
       <div className="titlebar-actions">
-        {user ? (
-          <button className="button button-secondary button-small" onClick={() => signOut()} title="Sign out">
-            <LogOut size={13} /> Sign out
-          </button>
-        ) : (
-          <button className="button button-primary button-small" onClick={() => setShowAuthModal(true)} title="Sign in">
-            <LogIn size={13} /> Sign in
-          </button>
-        )}
         <button className="icon-btn" title="Help"><CircleHelp size={15}/></button>
         <button className="icon-btn" title="Settings" onClick={() => setPage("Settings")}><Settings2 size={15}/></button>
         <div className="avatar" title={user?.email || "Local session"}>{userInitials}</div>
@@ -387,6 +378,7 @@ function App() {
         user={user}
         profile={profile}
         onOpenAuth={() => setShowAuthModal(true)}
+        onSignOut={signOut}
         isOpen={sidebarOpen}
       />
 
