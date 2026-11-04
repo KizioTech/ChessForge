@@ -32,7 +32,7 @@ export function BoardView({
   orientation = "white",
   onMove,
   interactive = true,
-  maxWidth = "440px"
+  maxWidth = "520px"
 }: BoardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cgRef = useRef<Api | null>(null);

@@ -731,68 +731,6 @@ function Analysis({
   }, [currentEval]);
 
   return <div className="content analysis-content">
-    <div className="analysis-heading">
-      <div>
-        <div className="eyebrow">
-          {activeGame ? (
-            <>
-              <Sparkles size={13}/> {activeGame.platform.toUpperCase()} GAME
-              <span className="demo-pill" style={{ color: "var(--lime)", borderColor: "var(--lime-dark)", background: "#1c2a1e" }}>
-                LIBRARY GAME
-              </span>
-            </>
-          ) : (
-            <>
-              GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span>
-            </>
-          )}
-        </div>
-        <h1>Analysis workspace</h1>
-        <p className="subheading">
-          {activeGame
-            ? `${activeGame.white} (${activeGame.white_elo || "unrated"}) vs ${activeGame.black} (${activeGame.black_elo || "unrated"}) · Result: ${activeGame.result} · ${activeGame.moves_count} moves`
-            : "Explore a position, navigate moves and inspect the analysis layout."}
-        </p>
-      </div>
-      <div className="analysis-actions">
-        {activeGame && (
-          <button className="button button-secondary" onClick={onClearActiveGame} title="Clear loaded game and start new board">
-            <Plus size={14}/> New board
-          </button>
-        )}
-        <button
-          className="button button-secondary"
-          onClick={() => setEngineEnabled(!engineEnabled)}
-          title={engineEnabled ? "Disable live evaluation" : "Enable live evaluation"}
-        >
-          <Zap size={14} style={{ color: engineEnabled ? "var(--lime)" : "var(--muted)" }}/>
-          {engineEnabled ? "Engine ON" : "Engine OFF"}
-        </button>
-        {isAnalyzing ? (
-          <button className="button button-secondary analysis-cancel-btn" onClick={onCancelAnalysis}>
-            <X size={14}/> Cancel ({analysisProgress}%)
-          </button>
-        ) : (
-          <button
-            className="button button-primary"
-            onClick={onAnalyzeGame}
-            disabled={!activeGame && !hasMoves}
-            title={!activeGame && !hasMoves ? "Make moves on the board or load a game to analyse" : undefined}
-          >
-            <Sparkles size={14}/> {analysisPositions.length > 0 ? "Re-analyse" : "Analyse game"}
-          </button>
-        )}
-      </div>
-    </div>
-
-    {/* Progress bar */}
-    {isAnalyzing && (
-      <div className="analysis-progress-track">
-        <div className="analysis-progress-bar" style={{ width: `${analysisProgress}%` }} />
-        <span className="analysis-progress-label">Analysing… {analysisProgress}%</span>
-      </div>
-    )}
-
     <div className="analysis-layout">
       <section className="board-panel panel">
         <div className="board-topline">
@@ -848,7 +786,7 @@ function Analysis({
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                maxWidth: "468px",
+                maxWidth: "548px",
                 margin: "0 auto",
                 padding: "4px 0 8px 28px",
                 width: "100%",
@@ -893,7 +831,7 @@ function Analysis({
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                maxWidth: "468px",
+                maxWidth: "548px",
                 margin: "0 auto",
                 padding: "8px 0 4px 28px",
                 width: "100%",
@@ -946,6 +884,68 @@ function Analysis({
       </section>
 
       <aside className="analysis-side">
+        {/* Analysis workspace title & engine actions */}
+        <div className="analysis-heading">
+          <div>
+            <div className="eyebrow">
+              {activeGame ? (
+                <>
+                  <Sparkles size={13}/> {activeGame.platform.toUpperCase()} GAME
+                  <span className="demo-pill" style={{ color: "var(--lime)", borderColor: "var(--lime-dark)", background: "#1c2a1e" }}>
+                    LIBRARY GAME
+                  </span>
+                </>
+              ) : (
+                <>
+                  GAME REVIEW <span className="demo-pill">INTERACTIVE PREVIEW</span>
+                </>
+              )}
+            </div>
+            <h1>Analysis workspace</h1>
+            <p className="subheading">
+              {activeGame
+                ? `${activeGame.white} (${activeGame.white_elo || "unrated"}) vs ${activeGame.black} (${activeGame.black_elo || "unrated"}) · Result: ${activeGame.result} · ${activeGame.moves_count} moves`
+                : "Explore a position, navigate moves and inspect the analysis layout."}
+            </p>
+          </div>
+          <div className="analysis-actions">
+            {activeGame && (
+              <button className="button button-secondary" onClick={onClearActiveGame} title="Clear loaded game and start new board">
+                <Plus size={14}/> New board
+              </button>
+            )}
+            <button
+              className="button button-secondary"
+              onClick={() => setEngineEnabled(!engineEnabled)}
+              title={engineEnabled ? "Disable live evaluation" : "Enable live evaluation"}
+            >
+              <Zap size={14} style={{ color: engineEnabled ? "var(--lime)" : "var(--muted)" }}/>
+              {engineEnabled ? "Engine ON" : "Engine OFF"}
+            </button>
+            {isAnalyzing ? (
+              <button className="button button-secondary analysis-cancel-btn" onClick={onCancelAnalysis}>
+                <X size={14}/> Cancel ({analysisProgress}%)
+              </button>
+            ) : (
+              <button
+                className="button button-primary"
+                onClick={onAnalyzeGame}
+                disabled={!activeGame && !hasMoves}
+                title={!activeGame && !hasMoves ? "Make moves on the board or load a game to analyse" : undefined}
+              >
+                <Sparkles size={14}/> {analysisPositions.length > 0 ? "Re-analyse" : "Analyse game"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {isAnalyzing && (
+          <div className="analysis-progress-track">
+            <div className="analysis-progress-bar" style={{ width: `${analysisProgress}%` }} />
+            <span className="analysis-progress-label">Analysing… {analysisProgress}%</span>
+          </div>
+        )}
         {/* Engine Evaluation Panel */}
         <section className="panel evaluation-panel">
           <div className="panel-head">
