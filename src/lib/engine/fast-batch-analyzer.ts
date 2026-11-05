@@ -55,6 +55,56 @@ function evaluateFenHeuristic(chess: Chess): { scoreCp: number; mateIn: number |
 }
 
 /**
+ * Evaluates position including 1-ply tactical replies (quiescence captures & checks)
+ * to immediately penalize hanging pieces and detect tactical shots.
+ */
+function evaluateTacticalPosition(chess: Chess): { scoreCp: number; mateIn: number | null } {
+  if (chess.isCheckmate()) {
+    return {
+      scoreCp: chess.turn() === "w" ? -30000 : 30000,
+      mateIn: chess.turn() === "w" ? -1 : 1
+    };
+  }
+  if (chess.isDraw() || chess.isStalemate()) {
+    return { scoreCp: 0, mateIn: null };
+  }
+
+  const baseEval = evaluateFenHeuristic(chess);
+  const sideToMove = chess.turn();
+
+  const replies = chess.moves({ verbose: true });
+  if (replies.length === 0) return baseEval;
+
+  let bestReplyCp = baseEval.scoreCp;
+  let replyMateIn: number | null = baseEval.mateIn;
+
+  for (const r of replies) {
+    // Check tactical moves: captures, checks, promotions
+    if (!r.captured && !r.san.includes("+") && !r.san.includes("#") && !r.promotion) {
+      continue;
+    }
+
+    chess.move(r);
+    const ev = evaluateFenHeuristic(chess);
+    chess.undo();
+
+    if (sideToMove === "w") {
+      if (ev.scoreCp > bestReplyCp) {
+        bestReplyCp = ev.scoreCp;
+        replyMateIn = ev.mateIn;
+      }
+    } else {
+      if (ev.scoreCp < bestReplyCp) {
+        bestReplyCp = ev.scoreCp;
+        replyMateIn = ev.mateIn;
+      }
+    }
+  }
+
+  return { scoreCp: bestReplyCp, mateIn: replyMateIn };
+}
+
+/**
  * Fast evaluates a game with tactical 1-ply search to find real misses and best moves.
  */
 export async function fastAnalyzeGame(
@@ -111,7 +161,7 @@ export async function fastAnalyzeGame(
 
     for (const m of legalMoves) {
       playChess.move(m);
-      const ev = evaluateFenHeuristic(playChess);
+      const ev = evaluateTacticalPosition(playChess);
       playChess.undo();
 
       if (sideToMove === "w") {
@@ -148,7 +198,7 @@ export async function fastAnalyzeGame(
     // Now execute actual played move
     playChess.move(move);
     const afterFen = playChess.fen();
-    const afterEval = evaluateFenHeuristic(playChess);
+    const afterEval = evaluateTacticalPosition(playChess);
     const afterWinProb = calculateWinProbability(afterEval.scoreCp, afterEval.mateIn);
 
     const prevPos = positionRecords[positionRecords.length - 1];

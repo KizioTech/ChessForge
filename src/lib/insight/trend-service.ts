@@ -163,7 +163,19 @@ export async function getWeaknessAnalysis(
       return computeWeaknessAnalysis(localMistakes, totalGamesCount, totalMovesCount);
     }
 
-    return computeWeaknessAnalysis(data as MistakeRecord[], totalGamesCount, totalMovesCount);
+    // Merge remote mistakes with local mistakes, deduplicating by game + ply + position
+    const map = new Map<string, MistakeRecord>();
+    for (const m of localMistakes) {
+      const key = `${m.game_id || "g"}-${m.ply}-${m.fen.split(" ")[0]}`;
+      map.set(key, m);
+    }
+    for (const m of (data as MistakeRecord[])) {
+      const key = `${m.game_id || "g"}-${m.ply}-${m.fen.split(" ")[0]}`;
+      map.set(key, m);
+    }
+
+    const merged = Array.from(map.values());
+    return computeWeaknessAnalysis(merged, totalGamesCount, totalMovesCount);
   } catch {
     return computeWeaknessAnalysis(localMistakes, totalGamesCount, totalMovesCount);
   }

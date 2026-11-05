@@ -95,10 +95,11 @@ export function AnalyticsView({
 
   const loadData = () => {
     setLoading(true);
-    getWeaknessAnalysis(userId, totalGamesCount).then(data => {
+    const count = Math.max(totalGamesCount, games.length);
+    getWeaknessAnalysis(userId, count).then(data => {
       setReport(data);
-      if (data.mistakes.length > 0 && !selectedMistake) {
-        setSelectedMistake(data.mistakes[0]);
+      if (data.mistakes.length > 0) {
+        setSelectedMistake(prev => (prev && data.mistakes.some(m => m.id === prev.id) ? prev : data.mistakes[0]));
       }
       setLoading(false);
     });

@@ -129,31 +129,61 @@ export async function saveAnalysis(
 
   if (isSupabaseConfigured && isRealUuid(analysisInput.user_id) && isRealUuid(analysisInput.game_id)) {
     try {
-      // Upsert analysis run
-      const { data: savedAnalysis, error: aErr } = await supabase
+      const engineName = analysisInput.engine_name || "Stockfish";
+      const depth = analysisInput.depth || 16;
+
+      // Check if an analysis already exists for this game, engine, and depth
+      const { data: existingAnalysis } = await supabase
         .from("game_analyses")
-        .upsert(analysisRecord, { onConflict: "game_id,engine_name,depth" })
-        .select()
-        .single();
+        .select("id")
+        .eq("game_id", analysisInput.game_id)
+        .eq("engine_name", engineName)
+        .eq("depth", depth)
+        .maybeSingle();
 
-      if (aErr) throw aErr;
+      let realAnalysisId: string;
+      let savedAnalysis: GameAnalysisRecord;
 
-      const realAnalysisId = savedAnalysis?.id || analysisId;
+      if (existingAnalysis?.id) {
+        realAnalysisId = existingAnalysis.id;
+        // Delete old positions for this analysis before inserting
+        await supabase.from("positions").delete().eq("analysis_id", realAnalysisId);
 
-      // Upsert positions
+        // Update existing analysis record without modifying its primary key id
+        const { id: _ignored, ...updateFields } = analysisRecord;
+        const { data: updated, error: uErr } = await supabase
+          .from("game_analyses")
+          .update({ ...updateFields, updated_at: now })
+          .eq("id", realAnalysisId)
+          .select()
+          .single();
+
+        if (uErr) throw uErr;
+        savedAnalysis = updated as GameAnalysisRecord;
+      } else {
+        // Insert new record
+        const { data: inserted, error: iErr } = await supabase
+          .from("game_analyses")
+          .insert(analysisRecord)
+          .select()
+          .single();
+
+        if (iErr) throw iErr;
+        realAnalysisId = inserted.id;
+        savedAnalysis = inserted as GameAnalysisRecord;
+      }
+
+      // Insert positions with the confirmed analysis ID
       const toInsert = positionsRecords.map(p => ({
         ...p,
         analysis_id: realAnalysisId
       }));
 
-      // Delete old positions for this analysis before inserting
-      await supabase.from("positions").delete().eq("analysis_id", realAnalysisId);
-
       const { error: pErr } = await supabase.from("positions").insert(toInsert);
       if (pErr) throw pErr;
 
       return {
-        analysis: savedAnalysis as GameAnalysisRecord,
+        analysis: savedAnalysis,
         positions: toInsert
       };
     } catch (err) {

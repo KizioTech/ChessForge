@@ -77,6 +77,7 @@ export function generateExercisesFromGame({
   existingFens = new Set<string>(),
   userColour
 }: ExerciseGenerationInput): GeneratedExerciseSet {
+  const isUnknown = !userColour && (!game.user_colour || game.user_colour === "unknown");
   const playerColour: "white" | "black" =
     userColour ||
     (game.user_colour === "white" || game.user_colour === "black"
@@ -92,10 +93,12 @@ export function generateExercisesFromGame({
   }> = [];
 
   const allMistakes: MistakeRecord[] = [];
+  const plyToMistakeId = new Map<number, string>();
 
   for (const report of reports) {
-    // Rule 1: Only collect and train on the user's own moves
-    if (report.mover !== playerColour) continue;
+    // If user color is specified, only collect and train on the user's own moves;
+    // if color is unknown, capture all blunders in the game.
+    if (!isUnknown && report.mover !== playerColour) continue;
 
     // Collect user mistakes for the database record
     if (
@@ -119,8 +122,11 @@ export function generateExercisesFromGame({
           winPctLoss: report.loss
         });
 
+        const mistakeId = crypto.randomUUID();
+        plyToMistakeId.set(report.ply, mistakeId);
+
         allMistakes.push({
-          id: `mistake-${game.id}-${report.ply}`,
+          id: mistakeId,
           user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
           game_id: game.id,
           position_id: posAfter.id,
@@ -232,15 +238,18 @@ export function generateExercisesFromGame({
     const difficulty: ExerciseDifficulty =
       item.report.loss > 20 ? "easy" : item.report.loss > 10 ? "medium" : "hard";
 
+    const linkedMistakeId = plyToMistakeId.get(item.report.ply) || crypto.randomUUID();
+    const exerciseColour = isUnknown ? item.report.mover : playerColour;
+
     return {
-      id: `ex-${game.id}-${item.report.ply}`,
+      id: crypto.randomUUID(),
       user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
       game_id: game.id,
-      mistake_id: `mistake-${game.id}-${item.report.ply}`,
+      mistake_id: linkedMistakeId,
       fen: item.posBefore.fen,
-      user_colour: playerColour,
+      user_colour: exerciseColour,
       exercise_type: exerciseType,
-      prompt: buildPrompt(exerciseType, playerColour),
+      prompt: buildPrompt(exerciseType, exerciseColour),
       solutions: item.solutions,
       principal_variation: item.pv,
       blunder_move: {
