@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import {
   getWeaknessAnalysis,
+  getLocalMistakes,
+  computeWeaknessAnalysis,
   type WeaknessAnalysisReport,
   type TagFrequency
 } from "../lib/insight/trend-service";
@@ -86,22 +88,33 @@ export function AnalyticsView({
   onOpenAnalysis,
   onNavigateToTrain
 }: AnalyticsViewProps) {
-  const [report, setReport] = useState<WeaknessAnalysisReport | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialCount = Math.max(totalGamesCount, games.length);
+  const initialLocal = useMemo(() => computeWeaknessAnalysis(getLocalMistakes(), initialCount), [initialCount]);
+
+  const [report, setReport] = useState<WeaknessAnalysisReport>(initialLocal);
+  const [loading, setLoading] = useState(false);
   const [selectedTag, setSelectedTag] = useState<MistakeTag | "all">("all");
-  const [selectedMistake, setSelectedMistake] = useState<MistakeRecord | null>(null);
+  const [selectedMistake, setSelectedMistake] = useState<MistakeRecord | null>(
+    initialLocal.mistakes.length > 0 ? initialLocal.mistakes[0] : null
+  );
   const [isBatchScanning, setIsBatchScanning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
   const loadData = () => {
-    setLoading(true);
     const count = Math.max(totalGamesCount, games.length);
+    // Refresh local immediately
+    const freshLocal = computeWeaknessAnalysis(getLocalMistakes(), count);
+    setReport(freshLocal);
+    if (freshLocal.mistakes.length > 0 && !selectedMistake) {
+      setSelectedMistake(freshLocal.mistakes[0]);
+    }
+
+    // Then background fetch remote if available
     getWeaknessAnalysis(userId, count).then(data => {
       setReport(data);
       if (data.mistakes.length > 0) {
         setSelectedMistake(prev => (prev && data.mistakes.some(m => m.id === prev.id) ? prev : data.mistakes[0]));
       }
-      setLoading(false);
     });
   };
 
@@ -118,7 +131,14 @@ export function AnalyticsView({
       await batchAnalyzeGames(games, userId, (current, total) => {
         setBatchProgress({ current, total });
       });
-      loadData();
+
+      // Instantly load the fresh local analysis
+      const updatedCount = Math.max(totalGamesCount, games.length);
+      const freshAnalysis = computeWeaknessAnalysis(getLocalMistakes(), updatedCount);
+      setReport(freshAnalysis);
+      if (freshAnalysis.mistakes.length > 0) {
+        setSelectedMistake(freshAnalysis.mistakes[0]);
+      }
     } catch (err) {
       console.error("Batch scan error:", err);
     } finally {

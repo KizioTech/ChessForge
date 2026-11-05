@@ -11,7 +11,7 @@ import type { PositionRecord, CandidateLine, MoveAnalysisReport, MoveClassificat
 import { calculateWinProbability, getMoverWinProbability, classifyMove } from "./win-probability";
 import { saveAnalysis } from "../analyses";
 import { generateExercisesFromGame } from "../training/exercise-generator";
-import { saveGeneratedExercises } from "../training/training-service";
+import { saveGeneratedExercises, syncLocalTrainingToSupabase } from "../training/training-service";
 import { tagMistake } from "../insight/mistake-tagger";
 
 const PIECE_VALS: Record<string, number> = {
@@ -109,7 +109,8 @@ function evaluateTacticalPosition(chess: Chess): { scoreCp: number; mateIn: numb
  */
 export async function fastAnalyzeGame(
   gameRecord: GameRecord,
-  userId?: string
+  userId?: string,
+  options?: { skipRemoteSync?: boolean }
 ): Promise<{ positions: PositionRecord[]; reports: MoveAnalysisReport[] }> {
   const chess = new Chess(gameRecord.start_fen || undefined);
   const movesRaw = gameRecord.pgn ? gameRecord.pgn.trim() : "";
@@ -264,7 +265,7 @@ export async function fastAnalyzeGame(
     });
   }
 
-  // Save analysis record
+  // Save analysis record (respecting skipRemoteSync for batch speed)
   await saveAnalysis(
     {
       game_id: gameRecord.id,
@@ -277,7 +278,8 @@ export async function fastAnalyzeGame(
       moves_analyzed: positionRecords.length,
       total_moves: history.length
     },
-    positionRecords
+    positionRecords,
+    options
   );
 
   // Generate training exercises and mistakes
@@ -297,7 +299,7 @@ export async function fastAnalyzeGame(
     });
 
     if (generated.mistakes.length > 0 || generated.exercises.length > 0) {
-      await saveGeneratedExercises(generated.mistakes, generated.exercises, userId);
+      await saveGeneratedExercises(generated.mistakes, generated.exercises, userId, options);
     }
   } catch (err) {
     console.warn("Exercise generation error during batch analysis:", err);
@@ -308,6 +310,7 @@ export async function fastAnalyzeGame(
 
 /**
  * Fast-analyzes multiple games in the background with progress reporting.
+ * Operates purely offline-first to avoid network lag, then syncs in background.
  */
 export async function batchAnalyzeGames(
   games: GameRecord[],
@@ -315,11 +318,18 @@ export async function batchAnalyzeGames(
   onProgress?: (analyzed: number, total: number) => void
 ): Promise<void> {
   for (let i = 0; i < games.length; i++) {
-    await fastAnalyzeGame(games[i], userId);
+    await fastAnalyzeGame(games[i], userId, { skipRemoteSync: true });
     if (onProgress) {
       onProgress(i + 1, games.length);
     }
     // Yield to keep UI responsive
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 5));
+  }
+
+  // Once all games are locally scanned and stored, trigger background sync without blocking
+  if (userId) {
+    syncLocalTrainingToSupabase(userId).catch(err => {
+      console.warn("Background training sync deferred:", err);
+    });
   }
 }

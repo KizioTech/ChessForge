@@ -40,7 +40,7 @@ export interface WeaknessAnalysisReport {
 const LS_MISTAKES = "chessforge:mistakes";
 const LS_GAMES = "chessforge:games";
 
-function getLocalMistakes(): MistakeRecord[] {
+export function getLocalMistakes(): MistakeRecord[] {
   if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(LS_MISTAKES);
@@ -154,10 +154,16 @@ export async function getWeaknessAnalysis(
   }
 
   try {
-    const { data, error } = await supabase
+    const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
+      setTimeout(() => resolve({ data: null, error: new Error("Supabase network timeout") }), 2000)
+    );
+
+    const queryPromise = supabase
       .from("mistakes")
       .select("*")
       .eq("user_id", userId);
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
     if (error || !data) {
       return computeWeaknessAnalysis(localMistakes, totalGamesCount, totalMovesCount);

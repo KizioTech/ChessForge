@@ -88,7 +88,8 @@ export async function saveAnalysis(
     moves_analyzed: number;
     total_moves: number;
   },
-  positionsInput: Omit<PositionRecord, "id" | "analysis_id" | "created_at">[]
+  positionsInput: Omit<PositionRecord, "id" | "analysis_id" | "created_at">[],
+  options?: { skipRemoteSync?: boolean }
 ): Promise<FullGameAnalysis> {
   const analysisId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -123,23 +124,30 @@ export async function saveAnalysis(
   // Always cache locally
   saveLocalAnalysis(analysisInput.game_id, full);
 
-  // If Supabase is configured and user is signed in with valid UUIDs, sync remotely
+  // If Supabase is configured and user is signed in with valid UUIDs, sync remotely unless skipped
   const isRealUuid = (id?: string) =>
     !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  if (isSupabaseConfigured && isRealUuid(analysisInput.user_id) && isRealUuid(analysisInput.game_id)) {
+  if (!options?.skipRemoteSync && isSupabaseConfigured && isRealUuid(analysisInput.user_id) && isRealUuid(analysisInput.game_id)) {
     try {
       const engineName = analysisInput.engine_name || "Stockfish";
       const depth = analysisInput.depth || 16;
 
+      // Timeout race to prevent slow network / timed out connections from freezing the app
+      const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
+        setTimeout(() => resolve({ data: null, error: new Error("Analysis sync network timeout") }), 2000)
+      );
+
       // Check if an analysis already exists for this game, engine, and depth
-      const { data: existingAnalysis } = await supabase
+      const checkPromise = supabase
         .from("game_analyses")
         .select("id")
         .eq("game_id", analysisInput.game_id)
         .eq("engine_name", engineName)
         .eq("depth", depth)
         .maybeSingle();
+
+      const { data: existingAnalysis } = await Promise.race([checkPromise, timeoutPromise]);
 
       let realAnalysisId: string;
       let savedAnalysis: GameAnalysisRecord;
