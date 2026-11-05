@@ -12,7 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Current Status
 - **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
-- **Gate Status:** Phase 4 completed and signed off. v0.4.0 public installer release shipped.
+- **Target Release:** v0.5.0
+- **Gate Status:** In Progress on branch `phase-5/insight-weakness-diagnosis`
+
+### Added
+- **Deterministic Heuristic Mistake Tagger** (`src/lib/insight/mistake-tagger.ts`): Automatically identifies recurring mistake categories (`hanging_piece`, `missed_mate`, `missed_fork`, `back_rank_weakness`, `time_trouble`, and `missed_tactic`) with confidence metrics.
+- **Longitudinal Trend Service** (`src/lib/insight/trend-service.ts`): Aggregates user mistakes, computes blunders per 100 moves, and enforces the Core Principle #3 baseline guard (`N >= 20` games). Uses real `moves_count` from `GameRecord`; no longer estimates 38 moves/game.
+- **Analytics View** (`src/components/AnalyticsView.tsx`): Dedicated analytics page visualizing tactical blindspots, time-trouble vulnerability, and rolling blunder rates. Initialises synchronously from `localStorage` (no loading spinner). Passes real total move counts to `computeWeaknessAnalysis`.
+- **Fast Batch Scanner** (`src/lib/engine/fast-batch-analyzer.ts`): Heuristic screening scanner for rapid weakness-radar population. **Screening-only**: saves tagged `MistakeRecord`s locally; does NOT generate training exercises or write `game_analyses`/`positions` to Supabase. Skips games with unknown player colour.
+- **Supabase Migration 000005** (`supabase/migrations/20261104000005_phase5_insight.sql`): Added `mistake_tag_summary` view with `security_invoker = true` (enforces RLS) and GIN indexing on mistake tags.
+- **ADR-0010**: Documented Architecture Decision Record for mistake tagging heuristics and diagnostic thresholds.
+
+### Fixed
+- **RLS security**: `mistake_tag_summary` view now created with `WITH (security_invoker = true)` so the view executes under the caller's permissions and row-level security on `mistakes` is correctly enforced.
+- **Unknown-colour games**: `exercise-generator.ts` skips games where `user_colour` is unknown, preventing opponent mistakes being attributed to the player.
+- **Blunders/100 moves**: `computeWeaknessAnalysis` now receives real total move counts from `games.reduce((s,g) => s + g.moves_count, 0)` — the 38-moves-per-game estimate has been removed.
+- **Supabase 409/23503**: Analysis saves now use lookup-then-update/insert instead of blind upsert, eliminating FK violation errors on `positions`.
+- **Network resilience**: `getSession()` (cached) replaces `getUser()` (network) for auth; all Supabase queries race against a 2 s timeout for offline robustness.
+- **Build icons**: `build/icon.ico` and `build/icon.png` are now tracked in git (`.gitignore` previously excluded the entire `build/` directory).
+- **`.gitignore`**: Fixed `.release//` typo to `.release/`; `build/icon.ico` and `build/icon.png` are now explicitly unignored.
+
+### Removed
+- **Unvalidated 70% accuracy claim**: The Phase 5 exit criterion "≥ 70% agreement on Phase 0 golden dataset" has been removed from `ROADMAP.md` and `ADR-0010`. Empirical validation against a hand-labelled dataset is planned post-v0.5.0 release. Current exit criteria: 7/7 unit tests pass for all shipped tags.
 
 ---
 

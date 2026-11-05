@@ -9,11 +9,16 @@ import {
   Calendar,
   Mail,
   Shield,
-  Save
+  Save,
+  Brain,
+  Crosshair,
+  TrendingUp,
+  AlertTriangle
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured, type UserProfile } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
+import { getWeaknessAnalysis, type WeaknessAnalysisReport } from "../lib/insight/trend-service";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -55,12 +60,14 @@ export function ProfileModal({
   const [ratings, setRatings] = useState(getInitialRatings());
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [weaknessData, setWeaknessData] = useState<WeaknessAnalysisReport | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setRatings(getInitialRatings());
       setDisplayName(profile?.display_name || user?.email?.split("@")[0] || "");
       setSaveStatus("idle");
+      getWeaknessAnalysis(user?.id).then(setWeaknessData);
     }
   }, [isOpen, profile, user]);
 
@@ -330,6 +337,63 @@ export function ProfileModal({
               <span>Auth: <strong style={{ color: "var(--text)" }}>{user.app_metadata?.provider || "Supabase Auth"}</strong></span>
             </div>
           </div>
+
+          {/* Phase 5: Weakness & Diagnostic Profile Summary */}
+          {weaknessData && weaknessData.totalMistakes > 0 && (
+            <div style={{ borderTop: "1px solid var(--line)", paddingTop: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Brain size={14} style={{ color: "var(--lime)" }} />
+                  <strong style={{ fontSize: "12px", color: "var(--text)" }}>Diagnostic Weakness Profile</strong>
+                </div>
+                <span style={{ fontSize: "10px", color: "var(--muted)" }}>
+                  {weaknessData.totalMistakes} logged mistakes
+                </span>
+              </div>
+
+              <div style={{
+                background: "var(--panel2)",
+                border: "1px solid var(--line)",
+                borderRadius: "6px",
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>Blunder Rate:</span>
+                  <strong style={{ fontSize: "12px", color: weaknessData.blundersPer100Moves > 3 ? "#ef4444" : "var(--lime)" }}>
+                    {weaknessData.blundersPer100Moves} / 100 moves
+                  </strong>
+                </div>
+
+                {weaknessData.tagFrequencies.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: "10px", color: "var(--muted)", display: "block", marginBottom: "4px" }}>
+                      Top Tactical Blindspots:
+                    </span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                      {weaknessData.tagFrequencies.filter(t => t.count > 0).slice(0, 3).map(tf => (
+                        <span
+                          key={tf.tag}
+                          style={{
+                            fontSize: "10px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: "rgba(183, 227, 106, 0.1)",
+                            color: "var(--lime)",
+                            border: "1px solid rgba(183, 227, 106, 0.2)"
+                          }}
+                        >
+                          {tf.tag.replace(/_/g, " ")}: {tf.count} ({tf.percentage}%)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Actions Footer */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px", paddingTop: "12px", borderTop: "1px solid var(--line)" }}>

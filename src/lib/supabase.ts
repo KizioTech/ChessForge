@@ -32,20 +32,32 @@ export interface UserProfile {
 export async function getCurrentProfile(): Promise<UserProfile | null> {
   if (!isSupabaseConfigured) return null;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  try {
+    // Read session from local cache first — avoids network timeout on getUser()
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+    // Fast timeout race to prevent slow network / timeout from hanging the app
+    const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
+      setTimeout(() => resolve({ data: null, error: new Error("Profile network timeout") }), 2000)
+    );
 
-  if (error) {
-    console.error("Failed to fetch user profile:", error.message);
+    const fetchPromise = supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as UserProfile;
+  } catch {
     return null;
   }
-
-  return data as UserProfile;
 }
 

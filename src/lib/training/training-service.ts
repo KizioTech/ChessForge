@@ -4,7 +4,7 @@
  * Implements dual-layer storage (Supabase + LocalStorage fallback) adhering to ADR 0002 & ADR 0009.
  */
 
-import { supabase } from "../supabase";
+import { supabase, isSupabaseConfigured } from "../supabase";
 import type {
   TrainingExerciseRecord,
   MistakeRecord,
@@ -54,7 +54,8 @@ function saveLocal<T>(key: string, items: T[]): void {
 export async function saveGeneratedExercises(
   mistakes: MistakeRecord[],
   exercises: TrainingExerciseRecord[],
-  userId?: string
+  userId?: string,
+  options?: { skipRemoteSync?: boolean }
 ): Promise<{ exercises: TrainingExerciseRecord[]; schedule: ReviewScheduleRecord[] }> {
   const nowIso = new Date().toISOString();
 
@@ -71,7 +72,7 @@ export async function saveGeneratedExercises(
     updated_at: nowIso
   }));
 
-  // 2. LocalStorage dual-layer persistence
+  // 2. LocalStorage dual-layer persistence (instant offline cache)
   const existingExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
   const exerciseMap = new Map<string, TrainingExerciseRecord>();
   existingExercises.forEach(e => exerciseMap.set(e.id, e));
@@ -90,19 +91,24 @@ export async function saveGeneratedExercises(
   mistakes.forEach(m => mistakeMap.set(m.id, m));
   saveLocal(LS_MISTAKES, Array.from(mistakeMap.values()));
 
-  // 3. Remote Supabase persistence (if authenticated with UUID)
-  if (userId && isRealUuid(userId)) {
+  // 3. Remote Supabase persistence (if authenticated with UUID and not skipped)
+  if (!options?.skipRemoteSync && userId && isRealUuid(userId)) {
     try {
+      const timeoutPromise = new Promise<{ error: Error }>(resolve =>
+        setTimeout(() => resolve({ error: new Error("Training remote sync timeout") }), 2000)
+      );
+
       if (mistakes.length > 0) {
         const remoteMistakes = mistakes
           .filter(m => isRealUuid(m.game_id))
           .map(m => ({
             ...m,
             id: isRealUuid(m.id) ? m.id : undefined,
+            position_id: isRealUuid(m.position_id) ? m.position_id : null,
             user_id: userId
           }));
         if (remoteMistakes.length > 0) {
-          await supabase.from("mistakes").upsert(remoteMistakes);
+          await Promise.race([supabase.from("mistakes").upsert(remoteMistakes), timeoutPromise]);
         }
       }
 
@@ -112,10 +118,11 @@ export async function saveGeneratedExercises(
           .map(e => ({
             ...e,
             id: isRealUuid(e.id) ? e.id : undefined,
+            mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
             user_id: userId
           }));
         if (remoteExercises.length > 0) {
-          await supabase.from("training_exercises").upsert(remoteExercises);
+          await Promise.race([supabase.from("training_exercises").upsert(remoteExercises), timeoutPromise]);
         }
       }
 
@@ -126,7 +133,7 @@ export async function saveGeneratedExercises(
           user_id: userId
         }));
       if (remoteSchedules.length > 0) {
-        await supabase.from("review_schedule").upsert(remoteSchedules);
+        await Promise.race([supabase.from("review_schedule").upsert(remoteSchedules), timeoutPromise]);
       }
     } catch (err) {
       console.warn("Supabase training persistence fallback to local storage:", err);
@@ -134,6 +141,45 @@ export async function saveGeneratedExercises(
   }
 
   return { exercises, schedule: schedules };
+}
+
+/**
+ * Asynchronously synchronizes accumulated local mistakes and exercises to Supabase in the background.
+ */
+export async function syncLocalTrainingToSupabase(userId?: string): Promise<void> {
+  if (!isSupabaseConfigured || !userId || !isRealUuid(userId)) return;
+  try {
+    const allMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
+    const allExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
+
+    const validMistakes = allMistakes
+      .filter(m => isRealUuid(m.game_id))
+      .map(m => ({
+        ...m,
+        id: isRealUuid(m.id) ? m.id : undefined,
+        position_id: isRealUuid(m.position_id) ? m.position_id : null,
+        user_id: userId
+      }));
+
+    if (validMistakes.length > 0) {
+      await supabase.from("mistakes").upsert(validMistakes);
+    }
+
+    const validExercises = allExercises
+      .filter(e => isRealUuid(e.game_id || ""))
+      .map(e => ({
+        ...e,
+        id: isRealUuid(e.id) ? e.id : undefined,
+        mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
+        user_id: userId
+      }));
+
+    if (validExercises.length > 0) {
+      await supabase.from("training_exercises").upsert(validExercises);
+    }
+  } catch (err) {
+    console.warn("Background training sync fallback:", err);
+  }
 }
 
 /**

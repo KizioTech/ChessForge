@@ -22,6 +22,7 @@ import type {
   ExerciseDifficulty
 } from "./types";
 import { getMoverWinProbability, calculateWinProbability } from "../engine/win-probability";
+import { tagMistake } from "../insight/mistake-tagger";
 
 export interface ExerciseGenerationInput {
   game: GameRecord;
@@ -76,11 +77,16 @@ export function generateExercisesFromGame({
   existingFens = new Set<string>(),
   userColour
 }: ExerciseGenerationInput): GeneratedExerciseSet {
-  const playerColour: "white" | "black" =
+  const playerColour: "white" | "black" | undefined =
     userColour ||
     (game.user_colour === "white" || game.user_colour === "black"
       ? game.user_colour
-      : "white");
+      : undefined);
+
+  // If user color is unknown, skip generation to prevent opponent mistakes from polluting metrics
+  if (!playerColour) {
+    return { mistakes: [], exercises: [] };
+  }
 
   const eligibleCandidates: Array<{
     report: MoveAnalysisReport;
@@ -91,9 +97,10 @@ export function generateExercisesFromGame({
   }> = [];
 
   const allMistakes: MistakeRecord[] = [];
+  const plyToMistakeId = new Map<number, string>();
 
   for (const report of reports) {
-    // Rule 1: Only collect and train on the user's own moves
+    // Rule 1: Only collect and train on the user's verified moves
     if (report.mover !== playerColour) continue;
 
     // Collect user mistakes for the database record
@@ -106,8 +113,23 @@ export function generateExercisesFromGame({
       const posAfter = positions.find(p => p.ply === report.ply);
 
       if (posBefore && posAfter) {
+        const tagging = tagMistake({
+          fenBefore: posBefore.fen,
+          fenAfter: posAfter.fen,
+          playedUci: report.playedUci,
+          playedSan: report.playedSan,
+          bestUci: report.bestUci,
+          bestSan: report.bestSan,
+          pvLines: posBefore.pv_lines as CandidateLine[],
+          classification: report.classification,
+          winPctLoss: report.loss
+        });
+
+        const mistakeId = crypto.randomUUID();
+        plyToMistakeId.set(report.ply, mistakeId);
+
         allMistakes.push({
-          id: `mistake-${game.id}-${report.ply}`,
+          id: mistakeId,
           user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
           game_id: game.id,
           position_id: posAfter.id,
@@ -119,7 +141,8 @@ export function generateExercisesFromGame({
           win_pct_loss: report.loss,
           best_uci: report.bestUci,
           best_san: report.bestSan,
-          tags: [],
+          tags: tagging.tags,
+          tag_confidence: tagging.confidence,
           user_corrected: false
         });
       }
@@ -218,11 +241,13 @@ export function generateExercisesFromGame({
     const difficulty: ExerciseDifficulty =
       item.report.loss > 20 ? "easy" : item.report.loss > 10 ? "medium" : "hard";
 
+    const linkedMistakeId = plyToMistakeId.get(item.report.ply) || crypto.randomUUID();
+
     return {
-      id: `ex-${game.id}-${item.report.ply}`,
+      id: crypto.randomUUID(),
       user_id: game.user_id || "00000000-0000-0000-0000-000000000000",
       game_id: game.id,
-      mistake_id: `mistake-${game.id}-${item.report.ply}`,
+      mistake_id: linkedMistakeId,
       fen: item.posBefore.fen,
       user_colour: playerColour,
       exercise_type: exerciseType,

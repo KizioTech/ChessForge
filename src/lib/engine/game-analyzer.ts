@@ -19,6 +19,7 @@ import type {
 import { StockfishEngine } from "./stockfish-engine";
 import { getMoverWinProbability, classifyMove } from "./win-probability";
 import { saveAnalysis, type FullGameAnalysis } from "../analyses";
+import { tagMistake } from "../insight/mistake-tagger";
 
 export interface AnalysisProgress {
   currentPly: number;
@@ -181,6 +182,22 @@ export function computeMoveClassifications(
 
     const classification = classifyMove(loss, isBestMove);
 
+    let tags: string[] | undefined;
+    if (classification === "mistake" || classification === "blunder") {
+      const tagging = tagMistake({
+        fenBefore: before.fen,
+        fenAfter: after.fen,
+        playedUci: after.move_uci || "",
+        playedSan: after.move_san || "",
+        bestUci: before.best_move_uci,
+        bestSan: before.best_move_san,
+        pvLines: before.pv_lines as CandidateLine[],
+        classification,
+        winPctLoss: loss
+      });
+      tags = tagging.tags;
+    }
+
     reports.push({
       ply: after.ply,
       mover,
@@ -191,7 +208,8 @@ export function computeMoveClassifications(
       evalBefore,
       evalAfter,
       loss,
-      classification
+      classification,
+      tags
     });
   }
 
