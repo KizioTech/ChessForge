@@ -77,12 +77,16 @@ export function generateExercisesFromGame({
   existingFens = new Set<string>(),
   userColour
 }: ExerciseGenerationInput): GeneratedExerciseSet {
-  const isUnknown = !userColour && (!game.user_colour || game.user_colour === "unknown");
-  const playerColour: "white" | "black" =
+  const playerColour: "white" | "black" | undefined =
     userColour ||
     (game.user_colour === "white" || game.user_colour === "black"
       ? game.user_colour
-      : "white");
+      : undefined);
+
+  // If user color is unknown, skip generation to prevent opponent mistakes from polluting metrics
+  if (!playerColour) {
+    return { mistakes: [], exercises: [] };
+  }
 
   const eligibleCandidates: Array<{
     report: MoveAnalysisReport;
@@ -96,9 +100,8 @@ export function generateExercisesFromGame({
   const plyToMistakeId = new Map<number, string>();
 
   for (const report of reports) {
-    // If user color is specified, only collect and train on the user's own moves;
-    // if color is unknown, capture all blunders in the game.
-    if (!isUnknown && report.mover !== playerColour) continue;
+    // Rule 1: Only collect and train on the user's verified moves
+    if (report.mover !== playerColour) continue;
 
     // Collect user mistakes for the database record
     if (
@@ -239,7 +242,6 @@ export function generateExercisesFromGame({
       item.report.loss > 20 ? "easy" : item.report.loss > 10 ? "medium" : "hard";
 
     const linkedMistakeId = plyToMistakeId.get(item.report.ply) || crypto.randomUUID();
-    const exerciseColour = isUnknown ? item.report.mover : playerColour;
 
     return {
       id: crypto.randomUUID(),
@@ -247,9 +249,9 @@ export function generateExercisesFromGame({
       game_id: game.id,
       mistake_id: linkedMistakeId,
       fen: item.posBefore.fen,
-      user_colour: exerciseColour,
+      user_colour: playerColour,
       exercise_type: exerciseType,
-      prompt: buildPrompt(exerciseType, exerciseColour),
+      prompt: buildPrompt(exerciseType, playerColour),
       solutions: item.solutions,
       principal_variation: item.pv,
       blunder_move: {

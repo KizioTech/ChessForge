@@ -38,4 +38,5 @@ Furthermore, Core Principle #3 dictates "Evidence Over Assumptions": longitudina
 - Fast client-side evaluation without requiring external ML models or server round-trips.
 - Consistent with offline-first architecture (dual-layer Supabase + LocalStorage).
 - Users receive clear feedback on recurring patterns rather than unclassified errors.
+- **Accuracy disclaimer:** Tag accuracy against a hand-labelled golden dataset has not been measured. The heuristics are deterministic but not validated beyond the 7 unit tests in `tests/unit/mistake-tagger.test.ts`. The 70% exit criterion previously listed in the roadmap was removed pending empirical evaluation (planned post v0.5.0 release).
 

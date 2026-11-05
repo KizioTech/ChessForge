@@ -248,8 +248,8 @@ test.describe("ChessForge Phase 1 Smoke Test", () => {
   test("Settings view displays themes, engine options, KizioTech author, and repository link", async ({ page }) => {
     await page.goto("/");
 
-    // Verify sidebar version tag is v0.4.0
-    await expect(page.locator(".sidebar-foot .version-pill")).toHaveText("v0.4.0");
+    // Verify sidebar version tag is v0.5.0
+    await expect(page.locator(".sidebar-foot .version-pill")).toHaveText("v0.5.0");
 
     // Navigate to Settings
     const settingsNav = page.locator("button.nav-item", { hasText: "Settings" });

@@ -102,15 +102,16 @@ export function AnalyticsView({
 
   const loadData = () => {
     const count = Math.max(totalGamesCount, games.length);
+    const totalMoves = games.reduce((sum, g) => sum + (g.moves_count || 0), 0);
     // Refresh local immediately
-    const freshLocal = computeWeaknessAnalysis(getLocalMistakes(), count);
+    const freshLocal = computeWeaknessAnalysis(getLocalMistakes(), count, totalMoves);
     setReport(freshLocal);
     if (freshLocal.mistakes.length > 0 && !selectedMistake) {
       setSelectedMistake(freshLocal.mistakes[0]);
     }
 
     // Then background fetch remote if available
-    getWeaknessAnalysis(userId, count).then(data => {
+    getWeaknessAnalysis(userId, count, totalMoves).then(data => {
       setReport(data);
       if (data.mistakes.length > 0) {
         setSelectedMistake(prev => (prev && data.mistakes.some(m => m.id === prev.id) ? prev : data.mistakes[0]));
@@ -132,9 +133,10 @@ export function AnalyticsView({
         setBatchProgress({ current, total });
       });
 
-      // Instantly load the fresh local analysis
+      // Instantly load the fresh local analysis with real move counts
       const updatedCount = Math.max(totalGamesCount, games.length);
-      const freshAnalysis = computeWeaknessAnalysis(getLocalMistakes(), updatedCount);
+      const totalMoves = games.reduce((sum, g) => sum + (g.moves_count || 0), 0);
+      const freshAnalysis = computeWeaknessAnalysis(getLocalMistakes(), updatedCount, totalMoves);
       setReport(freshAnalysis);
       if (freshAnalysis.mistakes.length > 0) {
         setSelectedMistake(freshAnalysis.mistakes[0]);

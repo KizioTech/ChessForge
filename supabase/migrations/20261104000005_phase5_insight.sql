@@ -2,7 +2,9 @@
 -- Description: Phase 5 views and helpers for weakness diagnosis and mistake tagging.
 
 -- 1. Create view for aggregating user mistake tag counts and blunder rates
-create or replace view public.mistake_tag_summary as
+-- Note: with (security_invoker = true) ensures the view respects Row Level Security on public.mistakes
+create or replace view public.mistake_tag_summary
+with (security_invoker = true) as
 select
   user_id,
   tag,

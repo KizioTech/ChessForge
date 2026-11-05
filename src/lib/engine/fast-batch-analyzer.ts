@@ -1,18 +1,39 @@
 /**
- * fast-batch-analyzer.ts — Fast client-side bulk analysis for library games.
+ * fast-batch-analyzer.ts — Fast client-side library screening for weakness diagnosis.
  *
- * Scans imported games to detect critical mistakes, blunders, hanging pieces, missed tactics,
- * and records mistakes + generates exercises immediately without freezing the UI.
+ * IMPORTANT: This scanner uses a material-count + 1-ply quiescence heuristic, NOT a real
+ * chess engine (see ADR-0004 for engine contracts). It is intentionally "screening only":
+ *
+ *   ✓ Saves tagged MistakeRecords locally for the weakness radar and Analytics view.
+ *   ✗ Does NOT generate TrainingExercises — those require verified Stockfish analysis.
+ *   ✗ Does NOT save game_analyses or position records to Supabase.
+ *
+ * The "best move" produced here is a heuristic guess. Users should open individual games
+ * in the Analysis workspace (Stockfish depth ≥ 12) for verified exercise generation.
  */
 
 import { Chess, type Square } from "chess.js";
 import type { GameRecord } from "../games";
 import type { PositionRecord, CandidateLine, MoveAnalysisReport, MoveClassification } from "./types";
 import { calculateWinProbability, getMoverWinProbability, classifyMove } from "./win-probability";
-import { saveAnalysis } from "../analyses";
-import { generateExercisesFromGame } from "../training/exercise-generator";
-import { saveGeneratedExercises, syncLocalTrainingToSupabase } from "../training/training-service";
 import { tagMistake } from "../insight/mistake-tagger";
+import { syncLocalTrainingToSupabase } from "../training/training-service";
+import type { MistakeRecord } from "../training/types";
+
+// Local storage key for the screening mistakes cache (separate from full exercise mistakes)
+const LS_SCREENING_MISTAKES = "chessforge:mistakes";
+
+function saveScreeningMistakes(newMistakes: MistakeRecord[]): void {
+  try {
+    const existing: MistakeRecord[] = JSON.parse(localStorage.getItem(LS_SCREENING_MISTAKES) || "[]");
+    const map = new Map<string, MistakeRecord>();
+    existing.forEach(m => map.set(`${m.game_id}-${m.ply}`, m));
+    newMistakes.forEach(m => map.set(`${m.game_id}-${m.ply}`, m));
+    localStorage.setItem(LS_SCREENING_MISTAKES, JSON.stringify(Array.from(map.values())));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 const PIECE_VALS: Record<string, number> = {
   p: 100,
@@ -265,68 +286,69 @@ export async function fastAnalyzeGame(
     });
   }
 
-  // Save analysis record (respecting skipRemoteSync for batch speed)
-  await saveAnalysis(
-    {
-      game_id: gameRecord.id,
-      user_id: userId,
-      engine_name: "Fast Heuristic Scanner",
-      engine_version: "1.0",
-      depth: 1,
-      multipv: 1,
-      status: "completed",
-      moves_analyzed: positionRecords.length,
-      total_moves: history.length
-    },
-    positionRecords,
-    options
-  );
+  // Screening-only: save tagged mistakes locally for the weakness radar.
+  // No game_analyses or positions are written (heuristic "best moves" are unreliable).
+  // No TrainingExercises are generated — those require verified Stockfish analysis.
+  if (gameRecord.user_colour !== "unknown") {
+    const playerColour = gameRecord.user_colour;
+    const screeningMistakes: MistakeRecord[] = reports
+      .filter(r => r.mover === playerColour && (r.classification === "blunder" || r.classification === "mistake"))
+      .map(r => ({
+        id: crypto.randomUUID(),
+        user_id: userId || "00000000-0000-0000-0000-000000000000",
+        game_id: gameRecord.id,
+        position_id: null,
+        ply: r.ply,
+        fen: positionRecords[r.ply - 1]?.fen ?? "",
+        played_san: r.playedSan,
+        played_uci: r.playedUci,
+        engine_class: r.classification as "blunder" | "mistake",
+        win_pct_loss: r.loss,
+        best_uci: r.bestUci || null,
+        best_san: r.bestSan || null,
+        tags: r.tags ?? [],
+        tag_confidence: {},
+        user_corrected: false
+      }));
 
-  // Generate training exercises and mistakes
-  try {
-    const userColour =
-      gameRecord.user_colour === "black"
-        ? "black"
-        : gameRecord.user_colour === "white"
-        ? "white"
-        : undefined;
-
-    const generated = generateExercisesFromGame({
-      game: gameRecord,
-      positions: positionRecords,
-      reports,
-      userColour
-    });
-
-    if (generated.mistakes.length > 0 || generated.exercises.length > 0) {
-      await saveGeneratedExercises(generated.mistakes, generated.exercises, userId, options);
+    if (screeningMistakes.length > 0) {
+      saveScreeningMistakes(screeningMistakes);
     }
-  } catch (err) {
-    console.warn("Exercise generation error during batch analysis:", err);
   }
 
   return { positions: positionRecords, reports };
 }
 
 /**
- * Fast-analyzes multiple games in the background with progress reporting.
- * Operates purely offline-first to avoid network lag, then syncs in background.
+ * Screens multiple games with the heuristic scanner for weakness radar population.
+ * Operates purely offline-first; no Supabase writes during the loop.
  */
 export async function batchAnalyzeGames(
   games: GameRecord[],
   userId?: string,
   onProgress?: (analyzed: number, total: number) => void
 ): Promise<void> {
-  for (let i = 0; i < games.length; i++) {
-    await fastAnalyzeGame(games[i], userId, { skipRemoteSync: true });
+  // Skip games with unknown user colour — can't distinguish player mistakes from opponent's
+  const knownColourGames = games.filter(g => g.user_colour === "white" || g.user_colour === "black");
+
+  for (let i = 0; i < knownColourGames.length; i++) {
+    await fastAnalyzeGame(knownColourGames[i], userId);
     if (onProgress) {
-      onProgress(i + 1, games.length);
+      // Report progress against the full games array so the UI count is consistent
+      const overallIdx = games.indexOf(knownColourGames[i]);
+      onProgress(overallIdx + 1, games.length);
     }
     // Yield to keep UI responsive
     await new Promise(r => setTimeout(r, 5));
   }
 
-  // Once all games are locally scanned and stored, trigger background sync without blocking
+  // Report skipped games to reach 100%
+  if (onProgress) {
+    onProgress(games.length, games.length);
+  }
+
+  // After local screening is complete, sync any verified mistakes from full Stockfish
+  // analyses to Supabase in the background (does not block the caller).
   if (userId) {
     syncLocalTrainingToSupabase(userId).catch(err => {
       console.warn("Background training sync deferred:", err);

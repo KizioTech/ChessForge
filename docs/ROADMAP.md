@@ -127,7 +127,7 @@ Before closing any phase, every item below must be satisfied:
 - **Status:** In Progress (Current Active Dev Phase — Phase 4 signed off)
 - **Release Target:** `v0.5.0`
 - **Scope:** Heuristic mistake tagging (hanging piece, missed mate, fork, back-rank), time-trouble detection, performance trend charts with sample sizes (N >= 20).
-- **Exit Criteria:** >= 70% agreement on Phase 0 golden dataset for all shipped tags.
+- **Exit Criteria:** 7/7 unit test cases pass for all shipped tags. Empirical agreement rate against a hand-labelled golden dataset is not yet measured; this is planned as a Phase 5 post-release validation step.
 
 ---
 

@@ -511,7 +511,8 @@ function Dashboard({
   const [weakness, setWeakness] = useState<WeaknessAnalysisReport | null>(null);
 
   useEffect(() => {
-    getWeaknessAnalysis(userId, games.length).then(setWeakness);
+    const totalMoves = games.reduce((sum, g) => sum + (g.moves_count || 0), 0);
+    getWeaknessAnalysis(userId, games.length, totalMoves).then(setWeakness);
   }, [userId, games.length]);
 
   return <div className="content dashboard-content">

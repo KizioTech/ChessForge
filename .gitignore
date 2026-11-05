@@ -1,7 +1,7 @@
 node_modules/
 dist/
 dist-electron/
-.release//
+.release/
 *.log
 .DS_Store
 .env
@@ -16,4 +16,7 @@ release/
 public/stockfish-19-lite-single.wasm
 public/stockfish-19-single.wasm
 public/stockfish-19.wasm
-build/
+# Electron build icons must be tracked for packaging
+build/*
+!build/icon.ico
+!build/icon.png
