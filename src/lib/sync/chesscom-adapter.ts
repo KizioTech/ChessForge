@@ -95,7 +95,11 @@ export class ChesscomAdapter implements PlatformAdapter {
 
     const { archives } = (await archiveResp.json()) as { archives: string[] };
 
-    // Find the first archive URL not yet completed (oldest first → newest last)
+    // Find the first archive URL not yet completed (oldest first → newest last).
+    // Note: The latest archive is the ongoing/current month. Past months become immutable
+    // and are stored in completedUrls. The latest month is never locked into completedUrls;
+    // instead, it uses ETag / 304 conditional requests so newly played games are always picked up.
+    const lastArchiveUrl = archives.length > 0 ? archives[archives.length - 1] : null;
     const pending = archives.filter(u => !completedSet.has(u));
     if (pending.length === 0) {
       return { games: [], cursor: { etags: cur.etags, completedUrls: cur.completedUrls }, done: true };
@@ -103,6 +107,7 @@ export class ChesscomAdapter implements PlatformAdapter {
 
     // Process ONE archive URL per call (keeps page sizes manageable)
     const monthUrl = pending[0];
+    const isLastArchive = monthUrl === lastArchiveUrl;
     const headers: HeadersInit = {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
@@ -118,13 +123,15 @@ export class ChesscomAdapter implements PlatformAdapter {
       throw new RateLimitError(retryAfter);
     }
 
-    // 304 Not Modified — month unchanged, mark as completed and move on
+    // 304 Not Modified — month unchanged
     if (monthResp.status === 304) {
-      const newCompletedUrls = [...cur.completedUrls, monthUrl];
+      const newCompletedUrls = isLastArchive
+        ? cur.completedUrls
+        : [...cur.completedUrls, monthUrl];
       return {
         games: [],
         cursor: { etags: cur.etags, completedUrls: newCompletedUrls },
-        done: newCompletedUrls.length === archives.length,
+        done: isLastArchive || newCompletedUrls.length >= archives.length,
       };
     }
 
@@ -147,11 +154,14 @@ export class ChesscomAdapter implements PlatformAdapter {
         platform: "chesscom" as const,
       }));
 
-    const newCompletedUrls = [...cur.completedUrls, monthUrl];
+    const newCompletedUrls = isLastArchive
+      ? cur.completedUrls
+      : [...cur.completedUrls, monthUrl];
+
     return {
       games: normalisedGames,
       cursor: { etags: newEtags, completedUrls: newCompletedUrls },
-      done: newCompletedUrls.length === archives.length,
+      done: isLastArchive || newCompletedUrls.length >= archives.length,
     };
   }
 }

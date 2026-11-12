@@ -11,7 +11,8 @@ import {
   Trophy,
   Activity,
   ArrowUpDown,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from "lucide-react";
 import type { GameRecord } from "../lib/games";
 
@@ -22,13 +23,17 @@ interface GameLibraryProps {
   onImport: () => void;
   onOpenAnalysis: (game: GameRecord) => void;
   onDeleteGame?: (id: string) => void;
+  onSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export function GameLibrary({
   games,
   onImport,
   onOpenAnalysis,
-  onDeleteGame
+  onDeleteGame,
+  onSync,
+  isSyncing
 }: GameLibraryProps) {
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -207,7 +212,18 @@ export function GameLibrary({
             {games.length} game{games.length === 1 ? "" : "s"} imported and ready for analysis and training.
           </p>
         </div>
-        <div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {onSync && (
+            <button
+              className="button button-secondary"
+              onClick={onSync}
+              disabled={isSyncing}
+              title="Check connected Chess.com and Lichess accounts for new games"
+            >
+              <RefreshCw size={14} className={isSyncing ? "spin" : ""} />
+              {isSyncing ? "Syncing…" : "Sync games"}
+            </button>
+          )}
           <button className="button button-primary" onClick={onImport}>
             <Upload size={14} /> Import games
           </button>

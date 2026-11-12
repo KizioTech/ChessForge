@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess, type Square } from "chess.js";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowLeft, ArrowRight,
@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CloudDownload,
   Command, Crosshair, Crown, Database, Download, FileUp, Filter, Flame, FolderOpen,
   Gauge, LayoutDashboard, Menu, MoreHorizontal, PanelLeftClose, Play,
-  Plus, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
+  Plus, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Target, Trophy, Upload,
   X, Zap, Undo2
 } from "lucide-react";
 import type { Page } from "./types";
@@ -37,6 +37,7 @@ import {
 } from "./lib/training/training-service";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "./lib/export";
 import { getWeaknessAnalysis, type WeaknessAnalysisReport } from "./lib/insight/trend-service";
+import { runAutoSync } from "./lib/sync/auto-sync";
 
 function ChessKnight({ size = 18 }: { size?: number }) {
   return (
@@ -161,6 +162,71 @@ function App() {
   useEffect(() => {
     refreshGames();
   }, [refreshGames]);
+
+  // ── Platform sync (auto-daily + manual "Sync Games" button) ─────────────────
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const syncAbortRef = useRef<AbortController | null>(null);
+
+  const handleSyncGames = useCallback(
+    async (dailyGated = false) => {
+      if (!user?.id || isSyncing) return;
+      setIsSyncing(true);
+      setSyncToast(dailyGated ? null : "Syncing games…");
+
+      const ctrl = new AbortController();
+      syncAbortRef.current = ctrl;
+
+      try {
+        const results = await runAutoSync(
+          {
+            userId: user.id,
+            username: user.email || profile?.display_name || undefined,
+            onGamesImported: () => {
+              // Refresh the game list as batches arrive.
+              getGames(user.id).then(setGames);
+            },
+            onComplete: (rs) => {
+              const total = rs.reduce((s, r) => s + r.gamesImported, 0);
+              if (total > 0) {
+                setSyncToast(`✓ ${total} new game${total !== 1 ? "s" : ""} imported`);
+              } else if (!dailyGated) {
+                setSyncToast("✓ Already up to date");
+              }
+              refreshGames();
+              setTimeout(() => setSyncToast(null), 4000);
+            },
+            signal: ctrl.signal,
+          },
+          dailyGated
+        );
+        // If dailyGated returned immediately (no accounts or already done), clear loading
+        if (results.length === 0 && dailyGated) {
+          setIsSyncing(false);
+          return;
+        }
+      } catch {
+        setSyncToast("Sync failed — check Settings → Platform Sync");
+        setTimeout(() => setSyncToast(null), 5000);
+      } finally {
+        setIsSyncing(false);
+        syncAbortRef.current = null;
+      }
+    },
+    [user, profile, isSyncing, refreshGames]
+  );
+
+  // Run once per day on startup (after user loads, non-blocking)
+  const hasTriedDailySync = useRef(false);
+  useEffect(() => {
+    if (!user?.id || hasTriedDailySync.current) return;
+    hasTriedDailySync.current = true;
+    // Small delay so the app UI renders first
+    const tid = setTimeout(() => {
+      handleSyncGames(true);
+    }, 3000);
+    return () => clearTimeout(tid);
+  }, [user?.id, handleSyncGames]);
 
   function openAnalysisForGame(gameRecord: GameRecord) {
     // Clear prior analysis state whenever a new game is loaded
@@ -393,6 +459,18 @@ function App() {
           <div className="toolbar-left"><button className="icon-btn collapse-btn" onClick={() => setSidebarOpen(!sidebarOpen)} title="Toggle sidebar"><PanelLeftClose size={16}/></button><span className="breadcrumb">Workspace</span><ChevronRight size={13}/><strong>{page}</strong></div>
           <div className="toolbar-right">
             <div className="search-box"><Search size={14}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search ChessForge"/><kbd>⌘ K</kbd></div>
+            {/* Sync Games button — visible only when user has an account connected */}
+            {user && (
+              <button
+                className={`button button-secondary${isSyncing ? " button-loading" : ""}`}
+                onClick={() => handleSyncGames(false)}
+                disabled={isSyncing}
+                title="Check all connected Chess.com and Lichess accounts for new games"
+              >
+                <RefreshCw size={14} className={isSyncing ? "spin" : ""}/>
+                {isSyncing ? "Syncing…" : "Sync Games"}
+              </button>
+            )}
             <button className="button button-secondary" onClick={() => setShowImport(true)}><Upload size={14}/> Import games</button>
             {games.length > 0 && (
               <button
@@ -409,6 +487,31 @@ function App() {
           </div>
         </div>
 
+        {/* Sync toast notification */}
+        {syncToast && (
+          <div
+            style={{
+              position: "fixed",
+              bottom: "20px",
+              right: "20px",
+              zIndex: 9999,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              padding: "10px 16px",
+              fontSize: "13px",
+              color: "var(--fg)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <RefreshCw size={13} style={{ color: "var(--lime)" }}/>
+            {syncToast}
+          </div>
+        )}
+
         {page === "Dashboard" && (
           <Dashboard
             games={games}
@@ -419,7 +522,16 @@ function App() {
             userId={user?.id}
           />
         )}
-        {page === "My Games" && <GameLibrary games={games} onImport={() => setShowImport(true)} onOpenAnalysis={openAnalysisForGame} onDeleteGame={handleDeleteGame} />}
+        {page === "My Games" && (
+          <GameLibrary
+            games={games}
+            onImport={() => setShowImport(true)}
+            onOpenAnalysis={openAnalysisForGame}
+            onDeleteGame={handleDeleteGame}
+            onSync={user ? () => handleSyncGames(false) : undefined}
+            isSyncing={isSyncing}
+          />
+        )}
         {page === "Analysis" && (
           <Analysis
             game={displayGame}

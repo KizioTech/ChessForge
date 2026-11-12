@@ -7,3 +7,5 @@ export * from "./account-service";
 export { ChesscomAdapter, RateLimitError as ChesscomRateLimitError } from "./chesscom-adapter";
 export { LichessAdapter, RateLimitError as LichessRateLimitError } from "./lichess-adapter";
 export { runSync } from "./sync-engine";
+export { runAutoSync, isAutoSyncDue, isAutoSyncRunning } from "./auto-sync";
+
