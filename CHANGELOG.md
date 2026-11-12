@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Opening Studio 3-Column Layout & Move Notation Panel**: Redesigned Repertoire Studio into a clean 3-column workspace:
+  - **Column 1 (Interactive Board & Navigation)**: Responsive board with quick-jump navigation (`⏮ Start`, `◀ Back`, `🔄 Flip`, `↺ Reset`), turn indicator, and PGN / ECO search actions.
+  - **Column 2 (Move List & Position Details)**: PGN-style scrollable notation pairs with live move tracking, recognized opening ECO badge and full name, and selective move notes editor.
+  - **Column 3 (Repertoire Moves, Popular Continuation Stats & Canonical Theory)**: Candidate repertoire moves, live Lichess Database continuations with win rate bars, and canonical theory lines.
+- **Move Suggestions & Popular Moves with Live Win Rates (`https://explorer.lichess.org`)**:
+  - Live FEN queries against Lichess Opening Explorer database for online and master games.
+  - Visual tri-color Win Bars (White win %, Draw %, Black win %) with precise percentage labels and games count.
+  - 1-click `+ Repertoire` button to immediately add popular continuations to repertoire trees without manual notation entry.
+  - 1-click preview on the interactive board for any suggested move.
+- **Enhanced Move Practice (Drilling Mode)**:
+  - Live opening recognition on the drill board with ECO badge.
+  - **"💡 Need a hint?"** practice assistant revealing the planned piece and move without resetting drill score.
+  - **"Common Moves & Win Rates"** panel showing the top continuations from the current drill position to help players learn what opponents commonly play.
+- **CSP Extension**: Added `https://explorer.lichess.org` to `connect-src` in `index.html`.
+
 ---
 
 ## [0.7.1] - 2026-11-12

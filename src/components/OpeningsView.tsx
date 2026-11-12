@@ -2,7 +2,7 @@
  * OpeningsView — Opening Repertoires, Practice Drilling, and Game Deviation Alerts
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Chess, type Square } from "chess.js";
 import {
   BookOpen,
@@ -77,6 +77,77 @@ interface OpeningsViewProps {
   onOpenAnalysis?: (game: GameRecord) => void;
 }
 
+// ── Lichess Opening Explorer hook ────────────────────────────────────────────
+
+interface ExplorerMove {
+  uci: string;
+  san: string;
+  white: number;
+  draws: number;
+  black: number;
+  averageRating?: number;
+}
+
+interface ExplorerData {
+  white: number;
+  draws: number;
+  black: number;
+  moves: ExplorerMove[];
+}
+
+function useExplorer(fen: string | null): { data: ExplorerData | null; loading: boolean } {
+  const [data, setData] = useState<ExplorerData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!fen) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    const url = `https://explorer.lichess.org/lichess?fen=${encodeURIComponent(fen)}&speeds=blitz,rapid&ratings=1200,1400,1600,1800`;
+    fetch(url)
+      .then(r => r.json())
+      .then((d: ExplorerData) => { if (!cancelled) { setData(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [fen]);
+
+  return { data, loading };
+}
+
+// ── Win percentage bar components ─────────────────────────────────────────────
+
+function WinBar({ white, draws, black }: { white: number; draws: number; black: number }) {
+  const total = white + draws + black;
+  if (total === 0) return null;
+  const wp = Math.round((white / total) * 100);
+  const dp = Math.round((draws / total) * 100);
+  const bp = 100 - wp - dp;
+  return (
+    <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", width: "100%", minWidth: "80px" }}>
+      <div style={{ width: `${wp}%`, background: "#e8e8e8", transition: "width 0.3s" }} title={`White: ${wp}%`} />
+      <div style={{ width: `${dp}%`, background: "#888", transition: "width 0.3s" }} title={`Draw: ${dp}%`} />
+      <div style={{ width: `${bp}%`, background: "#222", transition: "width 0.3s" }} title={`Black: ${bp}%`} />
+    </div>
+  );
+}
+
+function WinBarLabels({ white, draws, black }: { white: number; draws: number; black: number }) {
+  const total = white + draws + black;
+  if (total === 0) return null;
+  const wp = Math.round((white / total) * 100);
+  const dp = Math.round((draws / total) * 100);
+  const bp = 100 - wp - dp;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--muted)", marginTop: "2px" }}>
+      <span style={{ color: "#ccc" }}>{wp}%</span>
+      <span>{dp}%</span>
+      <span style={{ color: "var(--muted)" }}>{bp}%</span>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+
 export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProps) {
   const [repertoires, setRepertoires] = useState<RepertoireRecord[]>([]);
   const [activeSide, setActiveSide] = useState<RepertoireSide>("white");
@@ -121,6 +192,18 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
   const [listPage, setListPage] = useState(0);
   const [openingsList, setOpeningsList] = useState<{ items: EcoOpeningInfo[]; total: number }>({ items: [], total: 0 });
   const [listLoading, setListLoading] = useState(false);
+
+  // Notation scroll ref
+  const notationEndRef = useRef<HTMLDivElement>(null);
+
+  // Board orientation flip & drill hint state
+  const [boardFlipped, setBoardFlipped] = useState(false);
+  const [drillHint, setDrillHint] = useState<string | null>(null);
+
+  const displayOrientation = useMemo(() => {
+    if (boardFlipped) return activeSide === "white" ? "black" : "white";
+    return activeSide;
+  }, [activeSide, boardFlipped]);
 
   // Load repertoires on mount / user change
   const loadData = useCallback(async () => {
@@ -179,6 +262,10 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
   // ── Offline Opening Book (Lichess CC0) ─────────────────────────────────────
   const book = useOpeningBook();
 
+  // ── Lichess Explorer (live stats) ──────────────────────────────────────────
+  const explorer = useExplorer(book ? explorerChess.fen() : null);
+  const drillExplorer = useExplorer(activeTab === "drill" ? drillChess.fen() : null);
+
   // Identify opening & theoretical transitions from local opening book
   useEffect(() => {
     if (!book) return;
@@ -197,6 +284,18 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
       }))
     );
   }, [book, explorerChess]);
+
+  // Recognized opening during drill mode
+  const drillEco = useMemo(() => {
+    if (!book) return null;
+    const { opening } = identifyOpening(book, drillChess.history());
+    return opening ? { name: opening.name, eco: opening.eco, moves: opening.pgn } : null;
+  }, [book, drillChess]);
+
+  // Auto-scroll notation to bottom when history grows
+  useEffect(() => {
+    notationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [currentHistory.length]);
 
   // Search ECO Database handler (instant local search)
   const handleSearchEco = (e?: React.FormEvent) => {
@@ -342,6 +441,66 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     }
   };
 
+  // Navigate by clicking a theory move SAN
+  const handleExplorerMoveFromSan = (san: string) => {
+    try {
+      const temp = new Chess(explorerChess.fen());
+      const move = temp.move(san);
+      if (!move) return;
+      const uci = `${move.from}${move.to}${move.promotion || ""}`;
+      // Check if already in repertoire
+      const existing = candidateMoves.find(c => c.san === move.san || c.uci === uci);
+      if (existing) {
+        setCurrentHistory(prev => [...prev, { san: move.san, uci, node: existing }]);
+        setMoveComment(existing.comment || "");
+      } else {
+        // Just navigate (don't add to repertoire automatically for theory moves)
+        setCurrentHistory(prev => [...prev, { san: move.san, uci }]);
+        setMoveComment("");
+      }
+    } catch { /* invalid */ }
+  };
+
+  // Add a specific move directly to repertoire tree from explorer or common moves
+  const handleAddSanToRepertoire = async (san: string) => {
+    try {
+      const temp = new Chess(explorerChess.fen());
+      const move = temp.move(san);
+      if (!move) return;
+
+      const ply = currentHistory.length + 1;
+      const isUserMove = activeSide === "white" ? move.color === "w" : move.color === "b";
+      const uci = `${move.from}${move.to}${move.promotion || ""}`;
+
+      const existing = candidateMoves.find(c => c.san === move.san || c.uci === uci);
+      if (existing) {
+        setCurrentHistory(prev => [...prev, { san: move.san, uci, node: existing }]);
+        setMoveComment(existing.comment || "");
+        return;
+      }
+
+      const uId = userId || "local-user";
+      const newNode = await addRepertoireMove(currentRepertoire.id, uId, {
+        parentId: currentParentNode ? currentParentNode.id : null,
+        ply,
+        fen: temp.fen(),
+        san: move.san,
+        uci,
+        sideToMove: move.color === "w" ? "white" : "black",
+        isUserMove,
+        comment: "",
+      });
+
+      setLines(prev => [...prev, newNode]);
+      setCurrentHistory(prev => [...prev, { san: move.san, uci, node: newNode }]);
+      setMoveComment("");
+      setImportNotice(`Added "${move.san}" to your ${activeSide.toUpperCase()} repertoire!`);
+      setTimeout(() => setImportNotice(null), 3500);
+    } catch {
+      // invalid move
+    }
+  };
+
   // Jump to specific point in explorer history
   const handleJumpToHistory = (index: number) => {
     if (index === -1) {
@@ -417,6 +576,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
   // ── Practice / Drilling Logic ──────────────────────────────────────────────
 
   const handleStartDrill = () => {
+    setDrillHint(null);
     const { state, initialOpponentMove } = startDrillSession(repertoireTree, activeSide);
     const ch = new Chess(state.currentFen);
     setDrillChess(ch);
@@ -436,8 +596,34 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     setDrillActive(true);
   };
 
+  const handleShowDrillHint = () => {
+    const availableCandidates = drillSession.currentNode === null
+      ? repertoireTree
+      : drillSession.currentNode.children;
+
+    if (availableCandidates.length > 0) {
+      const target = availableCandidates[0].node;
+      const targetSan = target.san;
+      const pieceName = targetSan.startsWith("N")
+        ? "Knight"
+        : targetSan.startsWith("B")
+        ? "Bishop"
+        : targetSan.startsWith("R")
+        ? "Rook"
+        : targetSan.startsWith("Q")
+        ? "Queen"
+        : targetSan.startsWith("K") || targetSan.startsWith("O")
+        ? "King / Castling"
+        : "Pawn";
+      setDrillHint(`Expected: ${targetSan} (${pieceName})${target.comment ? ` — Note: ${target.comment}` : ""}`);
+    } else {
+      setDrillHint("No planned repertoire move recorded for this position.");
+    }
+  };
+
   const handleDrillMove = (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => {
     try {
+      setDrillHint(null);
       const temp = new Chess(drillChess.fen());
       const move = temp.move({ from, to, promotion: promotion || "q" });
       if (!move) return;
@@ -499,10 +685,28 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     return detectAllDeviations(games, repertoireTree, repertoireTree);
   }, [games, repertoireTree]);
 
+  // ── Notation panel: build paired move rows ─────────────────────────────────
+  // Pairs moves into [white, black?] tuples for display
+  const notationRows = useMemo(() => {
+    const rows: Array<{
+      moveNum: number;
+      white: { san: string; idx: number };
+      black: { san: string; idx: number } | null;
+    }> = [];
+    for (let i = 0; i < currentHistory.length; i += 2) {
+      rows.push({
+        moveNum: Math.floor(i / 2) + 1,
+        white: { san: currentHistory[i].san, idx: i },
+        black: i + 1 < currentHistory.length ? { san: currentHistory[i + 1].san, idx: i + 1 } : null,
+      });
+    }
+    return rows;
+  }, [currentHistory]);
+
   // ───────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="content" style={{ maxWidth: "1280px" }}>
+    <div className="content" style={{ maxWidth: "1400px" }}>
       {/* Top Header */}
       <div className="welcome-row" style={{ marginBottom: "16px" }}>
         <div>
@@ -575,209 +779,173 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
 
       {/* ── Mode 1: Repertoire Tree Builder ──────────────────────────────── */}
       {activeTab === "build" && (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: "24px" }}>
-          {/* Interactive Chessboard */}
-          <div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 420px) minmax(180px, 260px) 1fr", gap: "20px", alignItems: "start" }}>
+
+          {/* ── Column 1: Board + controls ─────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div className="panel" style={{ padding: "16px" }}>
               <BoardView
                 game={explorerChess}
-                orientation={activeSide}
+                orientation={displayOrientation}
                 onMove={handleExplorerMove}
                 interactive={true}
               />
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", fontSize: "11px", color: "var(--muted)" }}>
-                <span>Playing as: <strong>{activeSide.toUpperCase()}</strong></span>
-                <span>Drag pieces on board to explore or add lines</span>
+              {/* Navigation & Flip Toolbar */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <button
+                    className="button button-ghost button-small"
+                    disabled={currentHistory.length === 0}
+                    onClick={() => handleJumpToHistory(-1)}
+                    title="Jump to Start"
+                    style={{ padding: "3px 8px", fontSize: "11px" }}
+                  >
+                    ⏮ Start
+                  </button>
+                  <button
+                    className="button button-ghost button-small"
+                    disabled={currentHistory.length === 0}
+                    onClick={() => handleJumpToHistory(currentHistory.length - 2)}
+                    title="Step Back 1 Move"
+                    style={{ padding: "3px 8px", fontSize: "11px" }}
+                  >
+                    ◀ Back
+                  </button>
+                  <button
+                    className="button button-ghost button-small"
+                    onClick={() => setBoardFlipped(f => !f)}
+                    title="Flip Board Orientation"
+                    style={{ padding: "3px 8px", fontSize: "11px" }}
+                  >
+                    🔄 Flip
+                  </button>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 500 }}>
+                  {explorerChess.turn() === "w" ? "⚪ White to move" : "⚫ Black to move"}
+                </div>
               </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="panel" style={{ padding: "12px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              <button
+                className="button button-secondary button-small"
+                onClick={() => { setEcoSearchModal(true); setEcoSearchResults([]); setEcoSearchQuery(""); }}
+                title="Search canonical openings in offline book"
+                style={{ flex: 1, minWidth: "105px", fontSize: "11px" }}
+              >
+                <Search size={12}/> Search ECO
+              </button>
+              <button className="button button-secondary button-small" onClick={() => setImportPgnModal(true)} title="Import PGN into repertoire" style={{ flex: 1, minWidth: "105px", fontSize: "11px" }}>
+                <Upload size={12}/> Import PGN
+              </button>
+              <button className="button button-secondary button-small" onClick={handleExportPgn} title="Export repertoire to PGN" style={{ flex: 1, minWidth: "105px", fontSize: "11px" }}>
+                <Download size={12}/> Export PGN
+              </button>
             </div>
           </div>
 
-          {/* Right Panel: Repertoire Details & Variations */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Action Bar */}
-            <div className="panel" style={{ padding: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3 style={{ margin: "0 0 4px", fontSize: "15px" }}>{currentRepertoire?.title}</h3>
-                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                  {lines.length} recorded positions · {activeSide === "white" ? "1. e4 / 1. d4 / 1. c4 lines" : "Responses as Black"}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  className="button button-secondary button-small"
-                  onClick={() => { setEcoSearchModal(true); setEcoSearchResults([]); setEcoSearchQuery(""); }}
-                  title="Search 16,000+ openings from the eco.json database"
-                >
-                  <Search size={13}/> Search ECO
-                </button>
-                <button className="button button-secondary button-small" onClick={() => setImportPgnModal(true)} title="Import PGN into repertoire">
-                  <Upload size={13}/> Import PGN
-                </button>
-                <button className="button button-secondary button-small" onClick={handleExportPgn} title="Export repertoire to PGN">
-                  <Download size={13}/> Export PGN
-                </button>
-              </div>
-            </div>
-
-            {/* Current Variation Breadcrumb Navigation & Recognized ECO */}
+          {/* ── Column 2: Move Notation + ECO info + Notes ─────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div className="panel" style={{ padding: "14px" }}>
-              <div className="eyebrow" style={{ marginBottom: "8px" }}>ACTIVE LINE</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                <button
-                  className={`badge ${currentHistory.length === 0 ? "badge-primary" : "badge-secondary"}`}
+              <div className="eyebrow" style={{ marginBottom: "8px" }}>MOVE LIST</div>
+
+              {/* Scrollable notation list */}
+              <div style={{ maxHeight: "280px", overflowY: "auto", fontFamily: "monospace", fontSize: "13px" }}>
+                {/* Start row */}
+                <div
+                  style={{
+                    padding: "3px 6px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    color: currentHistory.length === 0 ? "var(--lime)" : "var(--muted)",
+                    fontWeight: currentHistory.length === 0 ? 700 : 400,
+                    marginBottom: "2px",
+                  }}
                   onClick={() => handleJumpToHistory(-1)}
-                  style={{ cursor: "pointer" }}
                 >
                   Start
-                </button>
-                {currentHistory.map((m, idx) => (
-                  <React.Fragment key={idx}>
-                    <ChevronRight size={12} style={{ color: "var(--muted)" }}/>
-                    <button
-                      className={`badge ${idx === currentHistory.length - 1 ? "badge-primary" : "badge-secondary"}`}
-                      onClick={() => handleJumpToHistory(idx)}
-                      style={{ cursor: "pointer", fontWeight: 600 }}
-                    >
-                      {idx % 2 === 0 ? `${Math.floor(idx / 2) + 1}. ` : ""}{m.san}
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-
-              {/* Real-time ECO Opening Name from @chess-openings/eco.json */}
-              {currentEco && (
-                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span
-                    style={{
-                      background: "rgba(183,227,106,0.18)",
-                      color: "var(--lime)",
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                      fontWeight: 700,
-                      fontSize: "11px",
-                      fontFamily: "monospace",
-                      border: "1px solid rgba(183,227,106,0.3)"
-                    }}
-                  >
-                    {currentEco.eco}
-                  </span>
-                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{currentEco.name}</span>
-                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>({currentEco.moves})</span>
                 </div>
-              )}
-            </div>
 
-            {/* Candidate Next Moves in this Position */}
-            <div className="panel" style={{ padding: "14px" }}>
-              <div className="eyebrow" style={{ marginBottom: "8px" }}>
-                {explorerChess.turn() === (activeSide === "white" ? "w" : "b")
-                  ? "YOUR REPERTOIRE RESPONSES"
-                  : "OPPONENT'S CANDIDATE REPLIES"}
-              </div>
-
-              {candidateMoves.length === 0 ? (
-                <div style={{ padding: "14px", textAlign: "center", background: "var(--sunken)", borderRadius: "6px" }}>
-                  <p style={{ margin: "0 0 6px", fontSize: "12px", color: "var(--muted)" }}>
-                    No planned moves from this position yet.
-                  </p>
-                  <span style={{ fontSize: "11px", color: "var(--lime)" }}>
-                    Play a move on the board to record it into your repertoire!
-                  </span>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {candidateMoves.map(candidate => (
-                    <div
-                      key={candidate.id}
+                {/* Numbered move rows */}
+                {notationRows.map(row => (
+                  <div key={row.moveNum} style={{ display: "flex", alignItems: "center", marginBottom: "1px" }}>
+                    <span style={{ color: "var(--muted)", minWidth: "28px", fontSize: "11px", paddingRight: "4px", textAlign: "right" }}>
+                      {row.moveNum}.
+                    </span>
+                    {/* White move */}
+                    <span
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "8px 12px",
-                        background: "var(--raised)",
-                        borderRadius: "6px",
-                        fontSize: "12px"
+                        padding: "2px 6px",
+                        borderRadius: "3px",
+                        cursor: "pointer",
+                        minWidth: "52px",
+                        color: row.white.idx === currentHistory.length - 1 ? "var(--lime)" : "var(--fg)",
+                        fontWeight: row.white.idx === currentHistory.length - 1 ? 700 : 400,
+                        background: row.white.idx === currentHistory.length - 1 ? "rgba(183,227,106,0.1)" : "transparent",
+                      }}
+                      onClick={() => handleJumpToHistory(row.white.idx)}
+                    >
+                      {row.white.san}
+                    </span>
+                    {/* Black move */}
+                    {row.black && (
+                      <span
+                        style={{
+                          padding: "2px 6px",
+                          borderRadius: "3px",
+                          cursor: "pointer",
+                          minWidth: "52px",
+                          color: row.black.idx === currentHistory.length - 1 ? "var(--lime)" : "var(--fg)",
+                          fontWeight: row.black.idx === currentHistory.length - 1 ? 700 : 400,
+                          background: row.black.idx === currentHistory.length - 1 ? "rgba(183,227,106,0.1)" : "transparent",
+                        }}
+                        onClick={() => handleJumpToHistory(row.black!.idx)}
+                      >
+                        {row.black.san}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <div ref={notationEndRef} />
+              </div>
+
+              {/* ECO badge below move list */}
+              {currentEco && (
+                <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        background: "rgba(183,227,106,0.18)",
+                        color: "var(--lime)",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontWeight: 700,
+                        fontSize: "11px",
+                        fontFamily: "monospace",
+                        border: "1px solid rgba(183,227,106,0.3)"
                       }}
                     >
-                      <div>
-                        <strong style={{ fontSize: "13px", color: "var(--lime)", marginRight: "8px" }}>
-                          {candidate.san}
-                        </strong>
-                        <span style={{ color: "var(--muted)", fontSize: "11px" }}>
-                          {candidate.comment || "No notes"}
-                        </span>
-                      </div>
-                      <button
-                        className="button button-secondary button-small"
-                        onClick={() => {
-                          setCurrentHistory(prev => [...prev, { san: candidate.san, uci: candidate.uci, node: candidate }]);
-                          setMoveComment(candidate.comment || "");
-                        }}
-                      >
-                        Explore <ArrowRight size={12}/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Canonical Theory Suggestions from Offline Book */}
-              {theoreticalTransitions.length > 0 && (
-                <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px dashed var(--border)" }}>
-                  <div className="eyebrow" style={{ marginBottom: "6px", color: "var(--muted)" }}>
-                    CANONICAL THEORY (OFFLINE BOOK)
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {theoreticalTransitions.map((t, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "6px 10px",
-                          background: "var(--sunken)",
-                          borderRadius: "4px",
-                          fontSize: "11px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
-                          {t.san && (
-                            <strong style={{ color: "var(--lime)", fontSize: "12px" }}>{t.san}</strong>
-                          )}
-                          <span style={{ fontWeight: 600, color: "var(--muted)" }}>[{t.eco}]</span>
-                          <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{t.name}</span>
-                          {t.lines && t.lines > 1 ? (
-                            <span style={{ fontSize: "10px", color: "var(--muted)" }}>({t.lines} lines)</span>
-                          ) : null}
-                        </div>
-                        <button
-                          className="button button-ghost button-small"
-                          style={{ fontSize: "11px", padding: "2px 6px", flexShrink: 0 }}
-                          onClick={() => handleImportEcoLine(t.moves, t.name)}
-                          title="Import this theoretical line into your repertoire"
-                        >
-                          + Add Line
-                        </button>
-                      </div>
-                    ))}
+                      {currentEco.eco}
+                    </span>
+                    <span style={{ fontSize: "12px", fontWeight: 600 }}>{currentEco.name}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Move Explanation / Comment Editor */}
+            {/* Notes editor — only when a node is selected */}
             {currentParentNode && (
               <div className="panel" style={{ padding: "14px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div className="eyebrow">NOTES FOR {currentParentNode.san}</div>
+                  <div className="eyebrow" style={{ fontSize: "10px" }}>NOTES FOR {currentParentNode.san}</div>
                   <button
                     className="button button-ghost button-small"
                     onClick={handleDeleteCurrentMove}
-                    style={{ color: "var(--red, #f87171)" }}
+                    style={{ color: "var(--red, #f87171)", fontSize: "10px" }}
                     title="Delete this move and all sub-variations"
                   >
-                    <Trash2 size={12}/> Delete Line
+                    <Trash2 size={11}/> Delete
                   </button>
                 </div>
                 <textarea
@@ -791,6 +959,234 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 <button className="button button-primary button-small" onClick={handleSaveComment}>
                   Save Notes
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Column 3: Candidate moves + Theory continuations ───────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+            {/* YOUR MOVES panel */}
+            <div className="panel" style={{ padding: "14px" }}>
+              <div className="eyebrow" style={{ marginBottom: "10px" }}>
+                {explorerChess.turn() === (activeSide === "white" ? "w" : "b")
+                  ? "YOUR MOVES"
+                  : "OPPONENT REPLIES"}
+              </div>
+
+              {candidateMoves.length === 0 ? (
+                <div style={{ padding: "14px", textAlign: "center", background: "var(--sunken)", borderRadius: "6px" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: "12px", color: "var(--muted)" }}>
+                    No planned moves from this position yet.
+                  </p>
+                  <span style={{ fontSize: "11px", color: "var(--lime)" }}>
+                    Play a move on the board to record it!
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {candidateMoves.map(candidate => {
+                    const expMove = explorer.data?.moves.find(m => m.san === candidate.san);
+                    return (
+                      <div
+                        key={candidate.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 12px",
+                          background: "var(--raised)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          border: "1px solid var(--border)",
+                        }}
+                        onClick={() => {
+                          setCurrentHistory(prev => [...prev, { san: candidate.san, uci: candidate.uci, node: candidate }]);
+                          setMoveComment(candidate.comment || "");
+                        }}
+                      >
+                        <span style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: 700, color: "var(--lime)", minWidth: "40px" }}>
+                          {candidate.san}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "12px", color: "var(--muted)", fontStyle: candidate.comment ? "normal" : "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {candidate.comment || "No notes"}
+                          </div>
+                          {expMove && (
+                            <div style={{ marginTop: "4px" }}>
+                              <WinBar white={expMove.white} draws={expMove.draws} black={expMove.black} />
+                              <WinBarLabels white={expMove.white} draws={expMove.draws} black={expMove.black} />
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className="button button-ghost button-small"
+                          style={{ fontSize: "12px", flexShrink: 0 }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setCurrentHistory(prev => [...prev, { san: candidate.san, uci: candidate.uci, node: candidate }]);
+                            setMoveComment(candidate.comment || "");
+                          }}
+                        >
+                          →
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* POPULAR DATABASE MOVES & WIN RATES (LICHESS) */}
+            {explorer.data && explorer.data.moves && explorer.data.moves.length > 0 && (
+              <div className="panel" style={{ padding: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>POPULAR MOVES &amp; WIN RATES</span>
+                    <span style={{ fontSize: "10px", color: "var(--muted)", textTransform: "none" }}>(Lichess Database)</span>
+                  </div>
+                  {explorer.loading && (
+                    <Activity size={12} style={{ color: "var(--muted)", animation: "spin 1s linear infinite" }} />
+                  )}
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {explorer.data.moves.slice(0, 6).map((m, idx) => {
+                    const total = m.white + m.draws + m.black;
+                    const inRepertoire = candidateMoves.some(c => c.san === m.san);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: "8px 12px",
+                          background: inRepertoire ? "rgba(183,227,106,0.06)" : "var(--sunken)",
+                          border: inRepertoire ? "1px solid rgba(183,227,106,0.3)" : "1px solid transparent",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => handleExplorerMoveFromSan(m.san)}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <strong style={{ fontSize: "15px", fontFamily: "monospace", color: inRepertoire ? "var(--lime)" : "var(--fg)", minWidth: "36px" }}>
+                              {m.san}
+                            </strong>
+                            {inRepertoire && (
+                              <span style={{ fontSize: "9px", background: "rgba(183,227,106,0.18)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 700 }}>
+                                IN REPERTOIRE
+                              </span>
+                            )}
+                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                              {(total / 1000).toFixed(total >= 1000000 ? 0 : 1)}k games
+                              {m.averageRating ? ` · ~${m.averageRating}` : ""}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            {!inRepertoire && (
+                              <button
+                                className="button button-ghost button-small"
+                                style={{ fontSize: "10px", padding: "2px 8px", color: "var(--lime)" }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleAddSanToRepertoire(m.san);
+                                }}
+                                title="Add this move directly to your repertoire tree"
+                              >
+                                + Repertoire
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <WinBar white={m.white} draws={m.draws} black={m.black} />
+                        <WinBarLabels white={m.white} draws={m.draws} black={m.black} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* THEORY CONTINUATIONS panel */}
+            {theoreticalTransitions.length > 0 && (
+              <div className="panel" style={{ padding: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div className="eyebrow">THEORY CONTINUATIONS (OFFLINE BOOK)</div>
+                  {explorer.loading && (
+                    <Activity size={12} style={{ color: "var(--muted)", animation: "spin 1s linear infinite" }} />
+                  )}
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {theoreticalTransitions.map((t, idx) => {
+                    const expMove = explorer.data?.moves.find(m => m.san === t.san);
+                    const total = expMove ? expMove.white + expMove.draws + expMove.black : 0;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: "8px 12px",
+                          background: "var(--sunken)",
+                          borderRadius: "6px",
+                          marginBottom: "0",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => t.san && handleExplorerMoveFromSan(t.san)}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: expMove ? "4px" : "0" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                            {t.san && (
+                              <strong style={{ fontSize: "15px", fontFamily: "monospace", color: "var(--lime)", minWidth: "36px", flexShrink: 0 }}>
+                                {t.san}
+                              </strong>
+                            )}
+                            <span style={{ fontSize: "10px", background: "rgba(183,227,106,0.15)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 700, flexShrink: 0 }}>
+                              {t.eco}
+                            </span>
+                            <span style={{ fontSize: "11px", color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {t.name}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
+                            {total > 0 && (
+                              <span style={{ fontSize: "10px", color: "var(--muted)" }}>
+                                {(total / 1000).toFixed(1)}k
+                              </span>
+                            )}
+                            <button
+                              className="button button-ghost button-small"
+                              style={{ fontSize: "10px", padding: "2px 6px" }}
+                              onClick={e => { e.stopPropagation(); handleImportEcoLine(t.moves, t.name); }}
+                              title="Import this theoretical line into your repertoire"
+                            >
+                              + Add Line
+                            </button>
+                          </div>
+                        </div>
+                        {expMove && (
+                          <>
+                            <WinBar white={expMove.white} draws={expMove.draws} black={expMove.black} />
+                            <WinBarLabels white={expMove.white} draws={expMove.draws} black={expMove.black} />
+                          </>
+                        )}
+                        {!expMove && explorer.loading && (
+                          <div style={{ height: "6px", background: "var(--border)", borderRadius: "3px" }} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Explorer aggregate stats (position total) */}
+            {explorer.data && (explorer.data.white + explorer.data.draws + explorer.data.black) > 0 && (
+              <div className="panel" style={{ padding: "12px 14px" }}>
+                <div className="eyebrow" style={{ marginBottom: "6px" }}>POSITION STATS (LICHESS)</div>
+                <WinBar white={explorer.data.white} draws={explorer.data.draws} black={explorer.data.black} />
+                <WinBarLabels white={explorer.data.white} draws={explorer.data.draws} black={explorer.data.black} />
+                <div style={{ fontSize: "10px", color: "var(--muted)", marginTop: "4px", textAlign: "right" }}>
+                  {((explorer.data.white + explorer.data.draws + explorer.data.black) / 1000).toFixed(1)}k games
+                </div>
               </div>
             )}
           </div>
@@ -808,6 +1204,23 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 onMove={handleDrillMove}
                 interactive={!drillSession.completed}
               />
+              {/* Show current opening name on drill board */}
+              {drillEco && (
+                <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{
+                    background: "rgba(183,227,106,0.18)",
+                    color: "var(--lime)",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    fontWeight: 700,
+                    fontSize: "10px",
+                    fontFamily: "monospace",
+                  }}>
+                    {drillEco.eco}
+                  </span>
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>{drillEco.name}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -852,6 +1265,13 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 {drillEval.message || "Ready to drill."}
               </div>
 
+              {/* Hint Box if requested */}
+              {drillHint && (
+                <div style={{ padding: "10px 14px", background: "rgba(183,227,106,0.1)", border: "1px dashed var(--lime)", borderRadius: "6px", marginBottom: "14px", fontSize: "12px", color: "var(--lime)" }}>
+                  💡 {drillHint}
+                </div>
+              )}
+
               {/* Drill Score Card */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
                 <div className="panel" style={{ padding: "12px", textAlign: "center", background: "var(--sunken)" }}>
@@ -866,10 +1286,53 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 </div>
               </div>
 
-              <button className="button button-primary" onClick={handleStartDrill}>
-                <RotateCcw size={14}/> Restart Drill
-              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button className="button button-primary" onClick={handleStartDrill} style={{ flex: 1 }}>
+                  <RotateCcw size={14}/> Restart Drill
+                </button>
+                {!drillSession.completed && (
+                  <button className="button button-secondary" onClick={handleShowDrillHint} title="Show hint for expected repertoire move">
+                    💡 Hint
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Practice Move Suggestions & Win Percentages */}
+            {drillExplorer.data && drillExplorer.data.moves && drillExplorer.data.moves.length > 0 && (
+              <div className="panel" style={{ padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>COMMON MOVES &amp; WIN RATES</span>
+                    <span style={{ fontSize: "10px", color: "var(--muted)", textTransform: "none" }}>(Position Context)</span>
+                  </div>
+                  {drillExplorer.loading && (
+                    <Activity size={12} style={{ color: "var(--muted)", animation: "spin 1s linear infinite" }} />
+                  )}
+                </div>
+                <p style={{ fontSize: "11px", color: "var(--muted)", margin: "0 0 10px" }}>
+                  Most common continuations played from this position across online games:
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {drillExplorer.data.moves.slice(0, 4).map((m, idx) => {
+                    const total = m.white + m.draws + m.black;
+                    return (
+                      <div key={idx} style={{ padding: "8px 12px", background: "var(--sunken)", borderRadius: "6px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <strong style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--lime)" }}>{m.san}</strong>
+                          <span style={{ fontSize: "10px", color: "var(--muted)" }}>
+                            {(total / 1000).toFixed(total >= 1000000 ? 0 : 1)}k games
+                          </span>
+                        </div>
+                        <WinBar white={m.white} draws={m.draws} black={m.black} />
+                        <WinBarLabels white={m.white} draws={m.draws} black={m.black} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1134,6 +1597,8 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
           </div>
         </div>
       )}
+
+      {/* ── Modal: Search Canonical Openings ─────────────────────────────── */}
       {ecoSearchModal && (
         <div className="modal-backdrop">
           <div className="modal" style={{ maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>

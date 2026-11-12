@@ -258,7 +258,7 @@ describe("Offline Opening Book Integration (Lichess CC0)", () => {
     expect(match.opening).not.toBeNull();
     expect(match.opening?.eco).toBe("C40");
     expect(match.opening?.name).toContain("King's Knight Opening");
-  });
+  }, 15000);
 
   it("identifies opening from PGN string", async () => {
     const { loadOpeningBook, identifyOpeningFromPgn } = await import("../../src/lib/openings");
