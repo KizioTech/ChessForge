@@ -46,16 +46,30 @@ import {
   startDrillSession,
   submitDrillMove,
   detectAllDeviations,
-  identifyOpeningFromGame,
-  getTheoreticalTransitions,
-  searchEcoOpenings,
-  getOpeningsList,
   ECO_CATEGORIES,
-  type EcoOpeningInfo,
-  type TheoreticalMoveOption,
+  useOpeningBook,
+  identifyOpening,
+  nextBookMoves,
+  listOpenings,
+  pgnToSan,
   START_FEN,
   normalizeFen
 } from "../lib/openings";
+
+export interface EcoOpeningInfo {
+  name: string;
+  eco: string;
+  moves: string;
+  isEcoRoot?: boolean;
+}
+
+export interface TheoreticalMoveOption {
+  name: string;
+  eco: string;
+  moves: string;
+  san?: string;
+  lines?: number;
+}
 
 interface OpeningsViewProps {
   userId?: string | null;
@@ -162,31 +176,35 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     return lines.filter(l => (l.parent_id ?? null) === parentId);
   }, [lines, currentParentNode]);
 
-  // Identify opening & theoretical transitions from eco.json database
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { opening } = await identifyOpeningFromGame(explorerChess);
-      if (!cancelled) {
-        setCurrentEco(opening);
-      }
-      const transitions = await getTheoreticalTransitions(explorerChess.fen());
-      if (!cancelled) {
-        setTheoreticalTransitions(transitions);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [explorerChess]);
+  // ── Offline Opening Book (Lichess CC0) ─────────────────────────────────────
+  const book = useOpeningBook();
 
-  // Search ECO Database handler
-  const handleSearchEco = async (e?: React.FormEvent) => {
+  // Identify opening & theoretical transitions from local opening book
+  useEffect(() => {
+    if (!book) return;
+    const sans = explorerChess.history();
+    const { opening } = identifyOpening(book, sans);
+    setCurrentEco(opening ? { name: opening.name, eco: opening.eco, moves: opening.pgn } : null);
+
+    const nexts = nextBookMoves(book, sans, 8);
+    setTheoreticalTransitions(
+      nexts.map(n => ({
+        name: n.example.name,
+        eco: n.example.eco,
+        moves: n.example.pgn,
+        san: n.san,
+        lines: n.lines,
+      }))
+    );
+  }, [book, explorerChess]);
+
+  // Search ECO Database handler (instant local search)
+  const handleSearchEco = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!ecoSearchQuery.trim()) return;
+    if (!book || !ecoSearchQuery.trim()) return;
     setEcoSearching(true);
-    const res = await searchEcoOpenings(ecoSearchQuery.trim(), 20);
-    setEcoSearchResults(res);
+    const res = listOpenings(book, { query: ecoSearchQuery.trim(), limit: 20 });
+    setEcoSearchResults(res.items.map(o => ({ name: o.name, eco: o.eco, moves: o.pgn })));
     setEcoSearching(false);
   };
 
@@ -201,41 +219,61 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     setTimeout(() => setImportNotice(null), 4000);
   };
 
-  // ── Openings Directory query effect ─────────────────────────────────────────
+  // ── Openings Directory query effect (instant local filtering) ───────────────
   useEffect(() => {
-    if (activeTab !== "list") return;
-    let cancelled = false;
+    if (activeTab !== "list" || !book) return;
     setListLoading(true);
-    (async () => {
-      const res = await getOpeningsList({
+
+    if (listRootsOnly) {
+      // Root openings: entries where the opening name has no ":" variation delimiter
+      const allMatching = listOpenings(book, {
         category: listCategory,
-        rootsOnly: listRootsOnly,
+        query: listSearch.trim(),
+        limit: 9999,
+        offset: 0,
+      }).items.filter(item => !item.name.includes(":"));
+
+      const total = allMatching.length;
+      const paginated = allMatching.slice(listPage * 24, (listPage + 1) * 24);
+      setOpeningsList({
+        items: paginated.map(o => ({
+          name: o.name,
+          eco: o.eco,
+          moves: o.pgn,
+          isEcoRoot: true,
+        })),
+        total,
+      });
+    } else {
+      const res = listOpenings(book, {
+        category: listCategory,
         query: listSearch.trim(),
         offset: listPage * 24,
         limit: 24,
       });
-      if (!cancelled) {
-        setOpeningsList(res);
-        setListLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, listCategory, listRootsOnly, listSearch, listPage]);
+      setOpeningsList({
+        items: res.items.map(o => ({
+          name: o.name,
+          eco: o.eco,
+          moves: o.pgn,
+          isEcoRoot: !o.name.includes(":"),
+        })),
+        total: res.total,
+      });
+    }
+
+    setListLoading(false);
+  }, [activeTab, book, listCategory, listRootsOnly, listSearch, listPage]);
 
   // Preview opening from Directory on interactive board
   const handlePreviewOpening = (movesStr: string) => {
     const c = new Chess();
     const hist: Array<{ san: string; uci: string; node?: RepertoireLineNode }> = [];
-    const tokens = movesStr
-      .replace(/\{[^}]*\}/g, "")
-      .split(/\s+/)
-      .filter(t => t && !/^\d+\.+$/.test(t) && !/^[0-9]+$/.test(t));
+    const sans = pgnToSan(movesStr);
 
-    for (const tok of tokens) {
+    for (const s of sans) {
       try {
-        const m = c.move(tok);
+        const m = c.move(s);
         if (m) {
           hist.push({
             san: m.san,
@@ -683,11 +721,11 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 </div>
               )}
 
-              {/* Canonical Theory Suggestions from ECO Database */}
+              {/* Canonical Theory Suggestions from Offline Book */}
               {theoreticalTransitions.length > 0 && (
                 <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px dashed var(--border)" }}>
                   <div className="eyebrow" style={{ marginBottom: "6px", color: "var(--muted)" }}>
-                    CANONICAL THEORY (ECO.JSON)
+                    CANONICAL THEORY (OFFLINE BOOK)
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {theoreticalTransitions.map((t, idx) => (
@@ -703,13 +741,19 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                           fontSize: "11px",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span style={{ fontWeight: 600, color: "var(--lime)" }}>{t.eco}</span>
-                          <span>{t.name}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                          {t.san && (
+                            <strong style={{ color: "var(--lime)", fontSize: "12px" }}>{t.san}</strong>
+                          )}
+                          <span style={{ fontWeight: 600, color: "var(--muted)" }}>[{t.eco}]</span>
+                          <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{t.name}</span>
+                          {t.lines && t.lines > 1 ? (
+                            <span style={{ fontSize: "10px", color: "var(--muted)" }}>({t.lines} lines)</span>
+                          ) : null}
                         </div>
                         <button
                           className="button button-ghost button-small"
-                          style={{ fontSize: "11px", padding: "2px 6px" }}
+                          style={{ fontSize: "11px", padding: "2px 6px", flexShrink: 0 }}
                           onClick={() => handleImportEcoLine(t.moves, t.name)}
                           title="Import this theoretical line into your repertoire"
                         >
@@ -932,7 +976,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                     checked={listRootsOnly}
                     onChange={e => { setListRootsOnly(e.target.checked); setListPage(0); }}
                   />
-                  <span>Roots only (499)</span>
+                  <span>Root openings only</span>
                 </label>
               </div>
             </div>
@@ -976,7 +1020,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
             {listLoading ? (
               <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
                 <Activity size={20} className="spin" style={{ display: "inline-block", marginRight: "8px", verticalAlign: "middle" }}/>
-                Loading openings from eco.json database…
+                Loading openings from offline book…
               </div>
             ) : openingsList.items.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
@@ -1093,9 +1137,9 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
       {ecoSearchModal && (
         <div className="modal-backdrop">
           <div className="modal" style={{ maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
-            <h3 style={{ margin: "0 0 8px" }}>Search Canonical Openings (ECO Database)</h3>
+            <h3 style={{ margin: "0 0 8px" }}>Search Canonical Openings (Offline Book)</h3>
             <p style={{ fontSize: "12px", color: "var(--muted)", margin: "0 0 12px" }}>
-              Search across 16,000+ official chess openings from Lichess &amp; SCID. Select any line to import it directly into your {activeSide.toUpperCase()} repertoire.
+              Search across 3,800+ official chess openings from Lichess (CC0). Select any line to import it directly into your {activeSide.toUpperCase()} repertoire.
             </p>
 
             <form onSubmit={handleSearchEco} style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>

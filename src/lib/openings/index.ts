@@ -7,4 +7,6 @@ export * from "./repertoire-tree";
 export * from "./repertoire-service";
 export * from "./repertoire-drill";
 export * from "./deviation-detector";
-export * from "./eco-book";
+export * from "./opening-book";
+export * from "./opening-stats";
+export * from "./use-opening-book";

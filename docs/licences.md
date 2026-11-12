@@ -13,8 +13,9 @@ This document maintains a continuous registry of external dependencies, librarie
 | **Vite** | ^6.0.5 | MIT | Build tool and dev server. |
 | **Electron** | ^33.4.11 | MIT | Desktop runtime shell. |
 | **Vitest** | Latest | MIT | Unit and property testing framework. |
+| **Lichess chess-openings** | CC0 1.0 (downloaded 2026-11-12) | CC0-1.0 | 3,865 opening names and lines in TSV format (bundled offline). https://github.com/lichess-org/chess-openings |
 
 ---
 
-*Last updated: 3 November 2026*
+*Last updated: 12 November 2026*
 

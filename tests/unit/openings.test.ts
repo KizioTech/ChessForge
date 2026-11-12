@@ -250,54 +250,51 @@ describe("Game Deviation Detection", () => {
   });
 });
 
-describe("ECO Opening Book Integration (@chess-openings/eco.json)", () => {
-  it("identifies opening from FEN", async () => {
-    const { identifyOpeningByFen } = await import("../../src/lib/openings");
-    // Position after 1. e4 e5 2. Nf3
-    const op = await identifyOpeningByFen("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
-    expect(op).not.toBeNull();
-    expect(op?.eco).toBe("C40");
-    expect(op?.name).toContain("King's Knight Opening");
+describe("Offline Opening Book Integration (Lichess CC0)", () => {
+  it("identifies opening from SAN moves", async () => {
+    const { loadOpeningBook, identifyOpening } = await import("../../src/lib/openings");
+    const book = await loadOpeningBook();
+    const match = identifyOpening(book, ["e4", "e5", "Nf3"]);
+    expect(match.opening).not.toBeNull();
+    expect(match.opening?.eco).toBe("C40");
+    expect(match.opening?.name).toContain("King's Knight Opening");
   });
 
-  it("identifies opening from chess.js game instance", async () => {
-    const { Chess } = await import("chess.js");
-    const { identifyOpeningFromGame } = await import("../../src/lib/openings");
-    const chess = new Chess();
-    chess.loadPgn("1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6");
-    const { opening } = await identifyOpeningFromGame(chess);
+  it("identifies opening from PGN string", async () => {
+    const { loadOpeningBook, identifyOpeningFromPgn } = await import("../../src/lib/openings");
+    const book = await loadOpeningBook();
+    const pgn = "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6";
+    const match = identifyOpeningFromPgn(book, pgn);
 
-    expect(opening).not.toBeNull();
-    expect(opening?.eco).toBe("B90");
-    expect(opening?.name).toContain("Sicilian");
+    expect(match.opening).not.toBeNull();
+    expect(match.opening?.eco).toBe("B90");
+    expect(match.opening?.name).toContain("Sicilian");
+    expect(match.opening?.name).toContain("Najdorf");
   });
 
   it("searches openings catalog by keyword", async () => {
-    const { searchEcoOpenings } = await import("../../src/lib/openings");
-    const results = await searchEcoOpenings("Caro-Kann", 5);
+    const { loadOpeningBook, listOpenings } = await import("../../src/lib/openings");
+    const book = await loadOpeningBook();
+    const results = listOpenings(book, { query: "Caro-Kann", limit: 5 });
 
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0].name.toLowerCase()).toContain("caro-kann");
+    expect(results.items.length).toBe(5);
+    expect(results.total).toBeGreaterThan(10);
+    expect(results.items[0].name.toLowerCase()).toContain("caro-kann");
   });
 
-  it("browses openings list with category and rootsOnly filters", async () => {
-    const { getOpeningsList } = await import("../../src/lib/openings");
-    
-    // Canonical roots only
-    const rootsResult = await getOpeningsList({ rootsOnly: true, limit: 10 });
-    expect(rootsResult.total).toBeGreaterThan(400);
-    expect(rootsResult.items.length).toBe(10);
-    expect(rootsResult.items[0].isEcoRoot).toBe(true);
+  it("browses openings list with category and pagination", async () => {
+    const { loadOpeningBook, listOpenings } = await import("../../src/lib/openings");
+    const book = await loadOpeningBook();
 
     // Filter by ECO Category B (Semi-Open)
-    const catBResult = await getOpeningsList({ category: "B", rootsOnly: true, limit: 5 });
+    const catBResult = listOpenings(book, { category: "B", limit: 5 });
     expect(catBResult.items.length).toBe(5);
     for (const item of catBResult.items) {
       expect(item.eco.startsWith("B")).toBe(true);
     }
 
     // Search query within list
-    const searchResult = await getOpeningsList({ query: "French", limit: 5 });
+    const searchResult = listOpenings(book, { query: "French", limit: 5 });
     expect(searchResult.items.length).toBeGreaterThan(0);
     expect(searchResult.items[0].name.toLowerCase()).toContain("french");
   });

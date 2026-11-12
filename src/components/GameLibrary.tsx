@@ -12,9 +12,11 @@ import {
   Activity,
   ArrowUpDown,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  BookOpen
 } from "lucide-react";
 import type { GameRecord } from "../lib/games";
+import { useOpeningBook, identifyOpeningFromPgn } from "../lib/openings";
 
 const PAGE_SIZE = 10;
 
@@ -42,6 +44,22 @@ export function GameLibrary({
   const [timeClassFilter, setTimeClassFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Offline opening book — loads once, then cached
+  const book = useOpeningBook();
+  const openingCache = useMemo(() => new Map<string, string>(), []);
+  const getOpeningLabel = useMemo(() => {
+    return (g: GameRecord): string => {
+      if (!book || !g.pgn) return "";
+      const hit = openingCache.get(g.id);
+      if (hit !== undefined) return hit;
+      const m = identifyOpeningFromPgn(book, g.pgn);
+      const label = m.opening ? `${m.opening.eco} · ${m.opening.name}` : "";
+      openingCache.set(g.id, label);
+      return label;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book]);
 
   // Reset pagination when search or filters change
   useEffect(() => {
@@ -360,13 +378,12 @@ export function GameLibrary({
           {filteredGames.slice(0, visibleCount).map(g => {
             const opp = getOpponentText(g);
             return (
-              <div
-                key={g.id}
+              <div key={g.id}
                 className="panel"
                 style={{
                   padding: "12px 18px",
                   display: "grid",
-                  gridTemplateColumns: "70px 1fr 140px 100px 140px",
+                  gridTemplateColumns: "70px 1fr 180px 140px 100px 140px",
                   alignItems: "center",
                   gap: "14px",
                   transition: "background .15s",
@@ -403,6 +420,22 @@ export function GameLibrary({
                   <div style={{ fontSize: "10px", color: "var(--muted)", marginTop: "2px" }}>
                     {g.termination || `${g.white} vs ${g.black}`}
                   </div>
+                </div>
+
+                {/* Opening */}
+                <div style={{ overflow: "hidden" }}>
+                  {getOpeningLabel(g) ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                      <BookOpen size={11} style={{ color: "var(--lime)", flexShrink: 0 }}/>
+                      <span style={{ fontSize: "10px", color: "var(--text)", lineHeight: "1.3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {getOpeningLabel(g)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: "10px", color: "var(--muted)" }}>
+                      {book ? "—" : "…"}
+                    </span>
+                  )}
                 </div>
 
                 {/* Time Control & Speed */}

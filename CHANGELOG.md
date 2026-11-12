@@ -12,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.1] - 2026-11-12
+
+### Current Status
+- **Phase:** Phase 7 follow-up (Offline Opening Book) — ✅ **Signed off**
+- **Branch:** `phase-7/offline-opening-book`
+- **Tag:** `v0.7.1`
+
+### Fixed
+- **Opening recognition now works offline (CSP fix):** Replaced `@chess-openings/eco.json` (runtime GitHub fetch, silently blocked by CSP) with the bundled Lichess chess-openings dataset (CC0, 3,865 openings, version-pinned). Opening names now resolve without internet access on every app launch.
+
+### Added
+- **Opening column in Game Library:** Every game row in My Games now shows the ECO code and opening name, computed offline from the bundled book.
+- **Results by Opening table in Analytics:** Shows W/D/L, score %, and average move leaving theory — grouped by opening family, minimum 3 games per row, with colour breakdown (White / Black).
+- **`src/lib/openings/opening-book.ts`:** Offline opening book module with transposition support. Key functions: `loadOpeningBook`, `identifyOpening`, `identifyOpeningFromPgn`, `listOpenings`, `nextBookMoves`, `openingFamily`, `positionKey` (board + turn + castling + legal-EP only).
+- **`src/lib/openings/opening-stats.ts`:** `openingStats()` pure function computing W/D/L results by opening family from game records.
+- **`src/lib/openings/use-opening-book.ts`:** React hook for lazy, cached book loading.
+- **ADR-0014 (`docs/decisions/0014-offline-opening-book.md`):** Documents the CSP root cause, the offline-bundle decision, and the trade-offs versus relaxing `connect-src`.
+- **14 unit tests (`tests/unit/opening-book.test.ts`):** Book loading, Najdorf B90 identification, transposition correctness, left-theory detection, en-passant key edge-case, custom-FEN skip, catalogue search/filter/pagination, `nextBookMoves`, `openingStats` W/D/L counting.
+
+### Removed
+- `@chess-openings/eco.json` npm package (uninstalled; data was runtime-fetched from an unpinned GitHub branch and blocked by CSP).
+- `src/lib/openings/eco-book.ts` (deleted; replaced by `opening-book.ts`).
+
+---
+
 ## [0.7.0] - 2026-11-12
 
 ### Current Status
