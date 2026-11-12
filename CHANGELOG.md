@@ -10,10 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.6.0] - 2026-11-12
+
 ### Current Status
-- **Active Phase:** Phase 5 (Insight & Weakness Diagnosis)
-- **Target Release:** v0.5.0
-- **Gate Status:** In Progress on branch `phase-5/insight-weakness-diagnosis`
+- **Phase:** Phase 6 (Platform Integrations) — ✅ **Signed off**
+- **Branch:** `phase-6/platform-integrations` merged to `main`
+- **Tag:** `v0.6.0`
+
+### Added
+- **Chess.com Adapter** (`src/lib/sync/chesscom-adapter.ts`): Fetches monthly game archives via PubAPI. Sends `If-None-Match`/ETag conditional requests to skip unchanged months; advances cursor per archive URL; raises typed `RateLimitError` on HTTP 429.
+- **Lichess Adapter** (`src/lib/sync/lichess-adapter.ts`): Streams PGN games via Lichess export API with `since` timestamp cursor, `clocks`/`opening`/`evals` options, and `RateLimitError` on HTTP 429.
+- **Sync Engine** (`src/lib/sync/sync-engine.ts`): Orchestrates full sync run — pages through adapter, writes checkpoints after every page, retries rate-limit errors with exponential back-off (min 60 s, max 5 min), and finalises import logs on completion, failure, or abort.
+- **Account Service** (`src/lib/sync/account-service.ts`): CRUD for `platform_accounts` and `import_logs` with Supabase + LocalStorage dual-layer persistence.
+- **Platform Sync UI** (`src/components/PlatformSyncView.tsx`): Add/remove Chess.com and Lichess accounts, trigger per-account sync with real-time progress (rate-limit warnings, games imported counter), cancel in-flight syncs, and view collapsible import log history. Displays live Rapid/Blitz/Bullet ELO fetched from each platform's public API.
+- **Settings — Platform Sync tab**: New tab in `SettingsView` exposing `PlatformSyncView` to signed-in users.
+- **Supabase Migration 000006** (`supabase/migrations/20261109000006_phase6_platform_sync.sql`): `import_logs` table with RLS; indexes on `(user_id, started_at desc)` and `(user_id, platform)`.
+- **ADR-0012**: Platform sync architecture — client-side adapters, cursor checkpoints, rate-limit policy, deduplication layers.
+- **10 new unit tests** (`tests/unit/platform-sync.test.ts`): ChesscomAdapter (5) and LichessAdapter (5) covering cursor advancement, ETag caching, 304 handling, rate-limit errors, and page completion detection.
+
+### Changed
+- `saveParsedGames` source param now accepts `"chesscom" | "lichess"` in addition to `"upload" | "paste"`.
+- `SettingsView` props extended: `userId`, `username`, `onGamesImported`, `profileChesscomUsername`, `profileLichessUsername` for sync wiring and profile seeding.
+- `package.json` version bumped to `0.6.0`.
+
+### Fixed
+- **ProfileModal bridge**: `handleSave` now calls `upsertPlatformAccount` for each non-empty Chess.com / Lichess username after saving to Supabase, ensuring `platform_accounts` rows are created immediately when usernames are entered in the profile editor.
+- **PlatformSyncView seeding**: On first load, reads `chessforge_custom_profile_ratings` from localStorage and upserts any profile usernames as `platform_accounts` rows — migration path for users who set usernames before Phase 6.
+- **ELO refresh**: `handleDelete` and `handleSync` now refresh the ELO map after account changes (previously ELO was only fetched on initial mount).
+
+---
+
+## [0.5.0] - 2026-11-05
 
 ### Added
 - **Deterministic Heuristic Mistake Tagger** (`src/lib/insight/mistake-tagger.ts`): Automatically identifies recurring mistake categories (`hanging_piece`, `missed_mate`, `missed_fork`, `back_rank_weakness`, `time_trouble`, and `missed_tactic`) with confidence metrics.

@@ -7,12 +7,14 @@ Full documentation resides in `docs/` and `ChessForge Documentation Set.md`.
 Read `docs/ROADMAP.md` to see the roadmap and milestones.
 
 ## Current Phase
-Phase 5: Insight & Weakness Diagnosis.
+Phase 7: Opening Repertoires (next phase — Phase 6 complete).
 - Phase 1 (Foundation): Complete & signed off.
 - Phase 2 (Data Ingestion & Integrity): Complete & signed off.
 - Phase 3 (Analysis Pipeline): Complete & signed off.
 - Phase 4 (Continuous Training Loop): Complete & signed off at `v1.0.0`.
-- Phase 5 (Current): Aggregated metrics, recurring weakness detection, opening/endgame diagnostic profiles.
+- Phase 5 (Insight & Weakness Diagnosis): Complete & signed off at `v0.5.0`.
+- Phase 6 (Platform Integrations): Complete & signed off at `v0.6.0` — Chess.com PubAPI + Lichess stream sync, live ELO display, rate limiting, deduplication, `import_logs` checkpoints.
+- Phase 7 (Next): Opening repertoire trees, practice drilling, game deviation alerts — `v0.7.0`.
 
 ## Changelog Policy
 After completing each distinct functional change or milestone, record a concise single-line entry under `[Unreleased]` in `CHANGELOG.md`. Avoid redundant multi-paragraph status recaps.

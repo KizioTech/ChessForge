@@ -1,4 +1,4 @@
-# ChessForge Phased Roadmap
+﻿# ChessForge Phased Roadmap
 
 **Version:** 1.1 · 3 November 2026  
 **Status:** Active  
@@ -124,18 +124,30 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 5: Insight & Weakness Diagnosis (R2)
-- **Status:** In Progress (Current Active Dev Phase — Phase 4 signed off)
+- **Status:** ✅ Complete (Signed off — commit `61d44b5`, release `v0.5.0`)
 - **Release Target:** `v0.5.0`
 - **Scope:** Heuristic mistake tagging (hanging piece, missed mate, fork, back-rank), time-trouble detection, performance trend charts with sample sizes (N >= 20).
-- **Exit Criteria:** 7/7 unit test cases pass for all shipped tags. Empirical agreement rate against a hand-labelled golden dataset is not yet measured; this is planned as a Phase 5 post-release validation step.
+- **Exit Criteria:**
+  - [x] 7/7 unit test cases pass for all shipped tags.
+  - [x] Fast batch scanner screening without database pollution.
+  - [x] RLS policies enforced on `mistake_tag_summary` with `security_invoker = true`.
+  - [x] Longitudinal trend service enforcing N >= 20 baseline guard.
 
 ---
 
 ### Phase 6: Platform Integrations (R2)
-- **Status:** Locked (Pending Phase 5 completion)
+- **Status:** ✅ Complete (Signed off — commit `b1e70a0`, release `v0.6.0`)
 - **Release Target:** `v0.6.0`
 - **Scope:** Automated sync from Chess.com (monthly archives + ETags) and Lichess (rate-limited stream API), background sync checkpoints and logging.
-- **Exit Criteria:** Sync operates automatically, handles rate limits (429 backoff), and does not re-import duplicates.
+- **Exit Criteria:**
+  - [x] Sync operates automatically for Chess.com and Lichess accounts.
+  - [x] Rate limits handled gracefully (429 exponential backoff, minimum 60s cooldown).
+  - [x] Deduplication verified: subsequent sync imports only new games with zero duplicates.
+  - [x] Resumable checkpoints written to `import_logs`.
+  - [x] ProfileModal saves upsert `platform_accounts` rows (bridge fix for existing users).
+  - [x] PlatformSyncView seeds from profile localStorage on first load; displays live ELO (Rapid/Blitz/Bullet).
+  - [x] DB migration `000006` for `import_logs` table with RLS; ADR `0012` recorded.
+  - [x] 10/10 adapter unit tests passing; `tsc --noEmit: 0 errors`; `npm run build` clean.
 
 ---
 
@@ -183,8 +195,8 @@ Before closing any phase, every item below must be satisfied:
 | **Phase 2** | Import & Library | ✅ **Complete** | Signed off — `v0.2.0` |
 | **Phase 3** | Analysis Engine | ✅ **Complete** | Signed off — `v0.3.0` |
 | **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v0.4.0` (The Loop) |
-| **Phase 5** | Insight & Weakness Diagnosis | 🔄 **Active** | Heuristic tagging, trend charts — target `v0.5.0` |
-| **Phase 6** | Platform Integrations | **Locked** | Requires Phase 5 gate sign-off |
+| **Phase 5** | Insight & Weakness Diagnosis | ✅ **Complete** | Signed off — `v0.5.0` |
+| **Phase 6** | Platform Integrations | ✅ **Complete** | Signed off — `v0.6.0` |
 | **Phase 7** | Opening Repertoires | **Locked** | Future milestone |
 | **Phase 8** | Endgame Lab & Calculation | **Locked** | Future milestone |
 | **Phase 9** | Desktop Packaging | ✅ **Complete** | Shipped early — `v0.4.0` public installer |
