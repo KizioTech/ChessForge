@@ -249,3 +249,34 @@ describe("Game Deviation Detection", () => {
     expect(deviation).toBeNull();
   });
 });
+
+describe("ECO Opening Book Integration (@chess-openings/eco.json)", () => {
+  it("identifies opening from FEN", async () => {
+    const { identifyOpeningByFen } = await import("../../src/lib/openings");
+    // Position after 1. e4 e5 2. Nf3
+    const op = await identifyOpeningByFen("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+    expect(op).not.toBeNull();
+    expect(op?.eco).toBe("C40");
+    expect(op?.name).toContain("King's Knight Opening");
+  });
+
+  it("identifies opening from chess.js game instance", async () => {
+    const { Chess } = await import("chess.js");
+    const { identifyOpeningFromGame } = await import("../../src/lib/openings");
+    const chess = new Chess();
+    chess.loadPgn("1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6");
+    const { opening } = await identifyOpeningFromGame(chess);
+
+    expect(opening).not.toBeNull();
+    expect(opening?.eco).toBe("B90");
+    expect(opening?.name).toContain("Sicilian");
+  });
+
+  it("searches openings catalog by keyword", async () => {
+    const { searchEcoOpenings } = await import("../../src/lib/openings");
+    const results = await searchEcoOpenings("Caro-Kann", 5);
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].name.toLowerCase()).toContain("caro-kann");
+  });
+});

@@ -20,7 +20,9 @@ import {
   Layers,
   Activity,
   Edit2,
-  Compass
+  Compass,
+  Search,
+  BookMarked
 } from "lucide-react";
 import { BoardView } from "./BoardView";
 import type { GameRecord } from "../lib/games";
@@ -41,6 +43,11 @@ import {
   startDrillSession,
   submitDrillMove,
   detectAllDeviations,
+  identifyOpeningFromGame,
+  getTheoreticalTransitions,
+  searchEcoOpenings,
+  type EcoOpeningInfo,
+  type TheoreticalMoveOption,
   START_FEN,
   normalizeFen
 } from "../lib/openings";
@@ -79,6 +86,14 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     correct: number;
     completed: boolean;
   }>({ currentFen: START_FEN, currentNode: null, total: 0, correct: 0, completed: false });
+
+  // ── ECO Opening Data integration state ──────────────────────────────────────
+  const [currentEco, setCurrentEco] = useState<EcoOpeningInfo | null>(null);
+  const [theoreticalTransitions, setTheoreticalTransitions] = useState<TheoreticalMoveOption[]>([]);
+  const [ecoSearchModal, setEcoSearchModal] = useState(false);
+  const [ecoSearchQuery, setEcoSearchQuery] = useState("");
+  const [ecoSearchResults, setEcoSearchResults] = useState<EcoOpeningInfo[]>([]);
+  const [ecoSearching, setEcoSearching] = useState(false);
 
   // Load repertoires on mount / user change
   const loadData = useCallback(async () => {
@@ -133,6 +148,45 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
     const parentId = currentParentNode ? currentParentNode.id : null;
     return lines.filter(l => (l.parent_id ?? null) === parentId);
   }, [lines, currentParentNode]);
+
+  // Identify opening & theoretical transitions from eco.json database
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { opening } = await identifyOpeningFromGame(explorerChess);
+      if (!cancelled) {
+        setCurrentEco(opening);
+      }
+      const transitions = await getTheoreticalTransitions(explorerChess.fen());
+      if (!cancelled) {
+        setTheoreticalTransitions(transitions);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [explorerChess]);
+
+  // Search ECO Database handler
+  const handleSearchEco = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!ecoSearchQuery.trim()) return;
+    setEcoSearching(true);
+    const res = await searchEcoOpenings(ecoSearchQuery.trim(), 20);
+    setEcoSearchResults(res);
+    setEcoSearching(false);
+  };
+
+  // Import line directly from ECO search result
+  const handleImportEcoLine = async (moves: string, name: string) => {
+    const uId = userId || "local-user";
+    const imported = await importPgnToRepertoire(currentRepertoire.id, uId, moves, activeSide);
+    setImportNotice(`Imported "${name}" (${imported} moves) into your ${activeSide} repertoire!`);
+    setEcoSearchModal(false);
+    const repLines = await getRepertoireLines(currentRepertoire.id, uId);
+    setLines(repLines);
+    setTimeout(() => setImportNotice(null), 4000);
+  };
 
   // Handle board move in Explorer mode
   const handleExplorerMove = (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => {
@@ -429,6 +483,13 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 </span>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className="button button-secondary button-small"
+                  onClick={() => { setEcoSearchModal(true); setEcoSearchResults([]); setEcoSearchQuery(""); }}
+                  title="Search 16,000+ openings from the eco.json database"
+                >
+                  <Search size={13}/> Search ECO
+                </button>
                 <button className="button button-secondary button-small" onClick={() => setImportPgnModal(true)} title="Import PGN into repertoire">
                   <Upload size={13}/> Import PGN
                 </button>
@@ -438,7 +499,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
               </div>
             </div>
 
-            {/* Current Variation Breadcrumb Navigation */}
+            {/* Current Variation Breadcrumb Navigation & Recognized ECO */}
             <div className="panel" style={{ padding: "14px" }}>
               <div className="eyebrow" style={{ marginBottom: "8px" }}>ACTIVE LINE</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
@@ -462,6 +523,28 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                   </React.Fragment>
                 ))}
               </div>
+
+              {/* Real-time ECO Opening Name from @chess-openings/eco.json */}
+              {currentEco && (
+                <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      background: "rgba(183,227,106,0.18)",
+                      color: "var(--lime)",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontWeight: 700,
+                      fontSize: "11px",
+                      fontFamily: "monospace",
+                      border: "1px solid rgba(183,227,106,0.3)"
+                    }}
+                  >
+                    {currentEco.eco}
+                  </span>
+                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{currentEco.name}</span>
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>({currentEco.moves})</span>
+                </div>
+              )}
             </div>
 
             {/* Candidate Next Moves in this Position */}
@@ -515,6 +598,44 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Canonical Theory Suggestions from ECO Database */}
+              {theoreticalTransitions.length > 0 && (
+                <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px dashed var(--border)" }}>
+                  <div className="eyebrow" style={{ marginBottom: "6px", color: "var(--muted)" }}>
+                    CANONICAL THEORY (ECO.JSON)
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {theoreticalTransitions.map((t, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "6px 10px",
+                          background: "var(--sunken)",
+                          borderRadius: "4px",
+                          fontSize: "11px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontWeight: 600, color: "var(--lime)" }}>{t.eco}</span>
+                          <span>{t.name}</span>
+                        </div>
+                        <button
+                          className="button button-ghost button-small"
+                          style={{ fontSize: "11px", padding: "2px 6px" }}
+                          onClick={() => handleImportEcoLine(t.moves, t.name)}
+                          title="Import this theoretical line into your repertoire"
+                        >
+                          + Add Line
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -683,6 +804,82 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Modal: Search ECO Opening Catalog ─────────────────────────── */}
+      {ecoSearchModal && (
+        <div className="modal-backdrop">
+          <div className="modal" style={{ maxWidth: "600px", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+            <h3 style={{ margin: "0 0 8px" }}>Search Canonical Openings (ECO Database)</h3>
+            <p style={{ fontSize: "12px", color: "var(--muted)", margin: "0 0 12px" }}>
+              Search across 16,000+ official chess openings from Lichess &amp; SCID. Select any line to import it directly into your {activeSide.toUpperCase()} repertoire.
+            </p>
+
+            <form onSubmit={handleSearchEco} style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+              <input
+                className="input"
+                type="text"
+                value={ecoSearchQuery}
+                onChange={e => setEcoSearchQuery(e.target.value)}
+                placeholder='e.g. "Sicilian", "Caro-Kann", "B12", "Ruy Lopez"'
+                style={{ flex: 1, fontSize: "13px" }}
+                autoFocus
+              />
+              <button className="button button-primary" type="submit" disabled={ecoSearching}>
+                <Search size={14}/> {ecoSearching ? "Searching…" : "Search"}
+              </button>
+            </form>
+
+            {/* Results List */}
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", maxHeight: "360px", paddingRight: "4px" }}>
+              {ecoSearchResults.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--muted)", fontSize: "12px" }}>
+                  {ecoSearchQuery ? "No openings found. Try a broader search term or ECO code." : "Type an opening name or code above to search."}
+                </div>
+              ) : (
+                ecoSearchResults.map((op, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      background: "var(--raised)",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border)",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <span style={{ background: "rgba(183,227,106,0.18)", color: "var(--lime)", padding: "1px 5px", borderRadius: "3px", fontWeight: 700, fontSize: "11px" }}>
+                          {op.eco}
+                        </span>
+                        <strong style={{ fontSize: "13px" }}>{op.name}</strong>
+                      </div>
+                      <div style={{ color: "var(--muted)", fontSize: "11px", fontFamily: "monospace" }}>
+                        {op.moves}
+                      </div>
+                    </div>
+                    <button
+                      className="button button-secondary button-small"
+                      onClick={() => handleImportEcoLine(op.moves, op.name)}
+                    >
+                      Import Line <ArrowRight size={12}/>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--border)" }}>
+              <button className="button button-ghost" onClick={() => setEcoSearchModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

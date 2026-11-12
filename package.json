@@ -17,6 +17,7 @@
     "dist:app": "npm run build && electron-builder"
   },
   "dependencies": {
+    "@chess-openings/eco.json": "^2.2.2",
     "@supabase/supabase-js": "^2.118.0",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
