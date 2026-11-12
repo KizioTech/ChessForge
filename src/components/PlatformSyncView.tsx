@@ -2,7 +2,8 @@
  * PlatformSyncView — Platform account management and sync control.
  *
  * Displays:
- * - Connected Chess.com and Lichess accounts
+ * - Connected Chess.com and Lichess accounts (auto-seeded from profile settings)
+ * - Live ELO ratings fetched from each platform's public API
  * - Add / remove account forms
  * - Per-account sync button with real-time progress
  * - Import log history (last 20 runs)
@@ -39,7 +40,11 @@ import type { GameRecord } from "../lib/games";
 
 interface PlatformSyncViewProps {
   userId: string;
-  username?: string; // Player's display name / email for colour detection
+  /** Player's display name / email for colour detection during PGN parsing. */
+  username?: string;
+  /** Pre-seeded usernames from profile settings (migration path). */
+  profileChesscomUsername?: string;
+  profileLichessUsername?: string;
   onGamesImported?: (games: GameRecord[]) => void;
 }
 
@@ -49,14 +54,12 @@ const PLATFORMS = [
     label: "Chess.com",
     icon: "♟",
     placeholder: "e.g. makawa7",
-    color: "#7fa650",
   },
   {
     id: "lichess" as const,
     label: "Lichess",
     icon: "♞",
     placeholder: "e.g. makawa7",
-    color: "#b48c3c",
   },
 ];
 
@@ -82,9 +85,81 @@ function statusBadge(status: ImportLog["status"]) {
   return <span className={cfg.cls} style={{ fontSize: "10px", padding: "2px 8px" }}>{cfg.label}</span>;
 }
 
-export function PlatformSyncView({ userId, username, onGamesImported }: PlatformSyncViewProps) {
+// ─── ELO fetching ────────────────────────────────────────────────────────────
+
+interface EloInfo {
+  rapid?: number;
+  blitz?: number;
+  bullet?: number;
+}
+
+async function fetchChesscomElo(username: string): Promise<EloInfo | null> {
+  try {
+    const r = await fetch(
+      `https://api.chess.com/pub/player/${encodeURIComponent(username)}/stats`,
+      { headers: { "User-Agent": "ChessForge/0.6.0 (personal-training; github.com/KizioTech/ChessForge)" } }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+    return {
+      rapid: data?.chess_rapid?.last?.rating,
+      blitz: data?.chess_blitz?.last?.rating,
+      bullet: data?.chess_bullet?.last?.rating,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchLichessElo(username: string): Promise<EloInfo | null> {
+  try {
+    const r = await fetch(
+      `https://lichess.org/api/user/${encodeURIComponent(username)}`,
+      { headers: { Accept: "application/json", "User-Agent": "ChessForge/0.6.0" } }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+    const perfs = data?.perfs ?? {};
+    return {
+      rapid: perfs?.rapid?.rating,
+      blitz: perfs?.blitz?.rating,
+      bullet: perfs?.bullet?.rating,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function EloDisplay({ elo }: { elo: EloInfo | null | undefined }) {
+  if (!elo) return null;
+  const entries = [
+    { label: "Rapid", val: elo.rapid },
+    { label: "Blitz", val: elo.blitz },
+    { label: "Bullet", val: elo.bullet },
+  ].filter(e => e.val !== undefined);
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      {entries.map(e => (
+        <span key={e.label} style={{ fontSize: "11px", color: "var(--muted)" }}>
+          <span style={{ color: "var(--lime)", fontWeight: 600 }}>{e.val}</span>{" "}
+          <span>{e.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function PlatformSyncView({
+  userId,
+  username,
+  profileChesscomUsername,
+  profileLichessUsername,
+  onGamesImported,
+}: PlatformSyncViewProps) {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [logs, setLogs] = useState<ImportLog[]>([]);
+  const [eloMap, setEloMap] = useState<Record<string, EloInfo | null>>({});
   const [addingPlatform, setAddingPlatform] = useState<"chesscom" | "lichess" | null>(null);
   const [addUsername, setAddUsername] = useState("");
   const [addError, setAddError] = useState("");
@@ -94,6 +169,23 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
   const [logsOpen, setLogsOpen] = useState(false);
   const abortRefs = useRef<Map<string, AbortController>>(new Map());
 
+  // ── Seed platform accounts from profile settings on first load ──────────────
+  const seedFromProfile = useCallback(async () => {
+    const toSeed: Array<{ platform: "chesscom" | "lichess"; username: string }> = [];
+    if (profileChesscomUsername?.trim()) toSeed.push({ platform: "chesscom", username: profileChesscomUsername.trim() });
+    if (profileLichessUsername?.trim()) toSeed.push({ platform: "lichess", username: profileLichessUsername.trim() });
+    if (toSeed.length === 0) return;
+
+    await Promise.all(
+      toSeed.map(({ platform, username: uname }) =>
+        upsertPlatformAccount(
+          { user_id: userId, platform, username: uname, last_synced_at: null, sync_cursor: {} },
+          userId
+        )
+      )
+    );
+  }, [userId, profileChesscomUsername, profileLichessUsername]);
+
   const reload = useCallback(async () => {
     const [accs, ls] = await Promise.all([
       getPlatformAccounts(userId),
@@ -101,13 +193,32 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
     ]);
     setAccounts(accs);
     setLogs(ls);
+    return accs;
   }, [userId]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  // ── Fetch live ELO for all accounts ────────────────────────────────────────
+  const fetchElos = useCallback(async (accs: PlatformAccount[]) => {
+    const results: Record<string, EloInfo | null> = {};
+    await Promise.all(
+      accs.map(async acc => {
+        const key = `${acc.platform}:${acc.username}`;
+        results[key] = acc.platform === "chesscom"
+          ? await fetchChesscomElo(acc.username)
+          : await fetchLichessElo(acc.username);
+      })
+    );
+    setEloMap(results);
+  }, []);
 
-  // ── Add account ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      await seedFromProfile();
+      const accs = await reload();
+      await fetchElos(accs);
+    })();
+  }, [seedFromProfile, reload, fetchElos]);
+
+  // ── Add account ─────────────────────────────────────────────────────────────
 
   const handleAdd = async () => {
     if (!addingPlatform) return;
@@ -128,7 +239,8 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
       );
       setAddingPlatform(null);
       setAddUsername("");
-      await reload();
+      const accs = await reload();
+      await fetchElos(accs);
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add account");
     } finally {
@@ -143,7 +255,8 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
     // Cancel any in-flight sync for this account
     abortRefs.current.get(account.id)?.abort();
     await deletePlatformAccount(account.id, userId);
-    await reload();
+    const accs = await reload();
+    await fetchElos(accs);
   };
 
   // ── Sync account ───────────────────────────────────────────────────────────
@@ -181,8 +294,8 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
       setSyncProgress(prev => ({ ...prev, [account.id]: { kind: "completed", platform: account.platform, username: account.username, gamesImported: result.gamesImported, gamesSkipped: result.gamesSkipped } }));
     }
 
-    await reload();
-    // Clear progress after a short delay
+    const accs = await reload();
+    await fetchElos(accs);
     setTimeout(() => setSyncProgress(prev => { const n = { ...prev }; delete n[account.id]; return n; }), 5000);
   };
 
@@ -220,6 +333,8 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
             {platAccounts.map(acc => {
               const prog = syncProgress[acc.id];
               const isSyncing = syncingId === acc.id;
+              const eloKey = `${acc.platform}:${acc.username}`;
+              const elo = eloMap[eloKey];
 
               return (
                 <div
@@ -235,12 +350,15 @@ export function PlatformSyncView({ userId, username, onGamesImported }: Platform
                     flexWrap: "wrap",
                   }}
                 >
-                  {/* Username */}
+                  {/* Username + ELO */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <strong style={{ fontSize: "13px", display: "block" }}>{acc.username}</strong>
-                    <span style={{ fontSize: "11px", color: "var(--muted)" }}>
-                      Last synced: {formatRelative(acc.last_synced_at)}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginTop: "2px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                        Last synced: {formatRelative(acc.last_synced_at)}
+                      </span>
+                      {elo !== undefined && <EloDisplay elo={elo} />}
+                    </div>
                   </div>
 
                   {/* Progress / status */}

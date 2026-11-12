@@ -19,6 +19,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured, type UserProfile } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { getWeaknessAnalysis, type WeaknessAnalysisReport } from "../lib/insight/trend-service";
+import { upsertPlatformAccount } from "../lib/sync/account-service";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -122,6 +123,45 @@ export function ProfileModal({
         await refreshProfile();
       } catch (err) {
         console.error("Failed to update profile in database:", err);
+      }
+    }
+
+    // 3. Register platform accounts so the sync engine can find them.
+    //    upsertPlatformAccount is idempotent — safe to call every save.
+    if (user) {
+      try {
+        const accountUpserts: Promise<unknown>[] = [];
+        if (ratings.chesscomUsername.trim()) {
+          accountUpserts.push(
+            upsertPlatformAccount(
+              {
+                user_id: user.id,
+                platform: "chesscom",
+                username: ratings.chesscomUsername.trim(),
+                last_synced_at: null,
+                sync_cursor: {},
+              },
+              user.id
+            )
+          );
+        }
+        if (ratings.lichessUsername.trim()) {
+          accountUpserts.push(
+            upsertPlatformAccount(
+              {
+                user_id: user.id,
+                platform: "lichess",
+                username: ratings.lichessUsername.trim(),
+                last_synced_at: null,
+                sync_cursor: {},
+              },
+              user.id
+            )
+          );
+        }
+        await Promise.all(accountUpserts);
+      } catch (err) {
+        console.warn("Platform account upsert non-fatal:", err);
       }
     }
 

@@ -40,6 +40,15 @@ export function SettingsView({ games, userId, username, onRefreshData, onGamesIm
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // Read profile-saved platform usernames from localStorage so PlatformSyncView can seed
+  // platform_accounts rows that may not yet exist (migration path for existing users).
+  const profileUsernames = (() => {
+    try {
+      const raw = localStorage.getItem("chessforge_custom_profile_ratings");
+      return raw ? (JSON.parse(raw) as { chesscomUsername?: string; lichessUsername?: string }) : {};
+    } catch { return {}; }
+  })();
+
   useEffect(() => {
     applyTheme(settings.theme);
   }, [settings.theme]);
@@ -426,6 +435,8 @@ export function SettingsView({ games, userId, username, onRefreshData, onGamesIm
                 <PlatformSyncView
                   userId={userId}
                   username={username}
+                  profileChesscomUsername={profileUsernames.chesscomUsername}
+                  profileLichessUsername={profileUsernames.lichessUsername}
                   onGamesImported={onGamesImported}
                 />
               ) : (
