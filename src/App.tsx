@@ -458,7 +458,12 @@ function App() {
         {page === "Settings" && (
           <SettingsView
             games={games}
+            userId={user?.id}
+            username={user?.email || profile?.display_name || undefined}
             onRefreshData={refreshGames}
+            onGamesImported={(newGames) => {
+              refreshGames();
+            }}
           />
         )}
         {page === "Analytics" && (

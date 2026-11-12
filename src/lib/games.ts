@@ -103,7 +103,7 @@ export async function getGames(userId?: string | null): Promise<GameRecord[]> {
  */
 export async function saveParsedGames(
   parsedGames: ParsedGame[],
-  source: "upload" | "paste" = "upload",
+  source: "upload" | "paste" | "chesscom" | "lichess" = "upload",
   userId?: string | null
 ): Promise<SaveGamesResult> {
   const result: SaveGamesResult = {

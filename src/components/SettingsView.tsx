@@ -12,7 +12,8 @@ import {
   Download,
   Trash2,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  CloudDownload,
 } from "lucide-react";
 import {
   getSettings,
@@ -23,15 +24,19 @@ import {
 import logoUrl from "../assets/logo.png";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "../lib/export";
 import type { GameRecord } from "../lib/games";
+import { PlatformSyncView } from "./PlatformSyncView";
 
 interface SettingsViewProps {
   games: GameRecord[];
+  userId?: string | null;
+  username?: string;
   onRefreshData?: () => void;
+  onGamesImported?: (games: GameRecord[]) => void;
 }
 
-export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
+export function SettingsView({ games, userId, username, onRefreshData, onGamesImported }: SettingsViewProps) {
   const [settings, setSettingsState] = useState<AppSettings>(getSettings());
-  const [activeTab, setActiveTab] = useState<"appearance" | "engine" | "training" | "data" | "about">("appearance");
+  const [activeTab, setActiveTab] = useState<"appearance" | "engine" | "training" | "sync" | "data" | "about">("appearance");
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -147,6 +152,13 @@ export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
             style={{ width: "100%", textAlign: "left", marginBottom: "4px" }}
           >
             <Brain size={16} /> Training & SM-2
+          </button>
+          <button
+            className={`nav-item ${activeTab === "sync" ? "active" : ""}`}
+            onClick={() => setActiveTab("sync")}
+            style={{ width: "100%", textAlign: "left", marginBottom: "4px" }}
+          >
+            <CloudDownload size={16} /> Platform Sync
           </button>
           <button
             className={`nav-item ${activeTab === "data" ? "active" : ""}`}
@@ -400,7 +412,33 @@ export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
             </div>
           )}
 
-          {/* 4. Data & Sovereignty */}
+          {/* 4. Platform Sync */}
+          {activeTab === "sync" && (
+            <div>
+              <div style={{ marginBottom: "16px" }}>
+                <div className="eyebrow">PLATFORM INTEGRATION</div>
+                <h2 style={{ fontSize: "16px", margin: "4px 0" }}>Chess.com &amp; Lichess Sync</h2>
+                <p style={{ color: "var(--muted)", fontSize: "12px", margin: 0 }}>
+                  Connect your platform accounts to automatically import new games. Rate limits and deduplication are handled automatically.
+                </p>
+              </div>
+              {userId ? (
+                <PlatformSyncView
+                  userId={userId}
+                  username={username}
+                  onGamesImported={onGamesImported}
+                />
+              ) : (
+                <div className="panel" style={{ padding: "20px", textAlign: "center" }}>
+                  <p style={{ color: "var(--muted)", fontSize: "13px" }}>
+                    Sign in to connect platform accounts and sync your games automatically.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5. Data & Sovereignty */}
           {activeTab === "data" && (
             <div className="panel" style={{ padding: "20px" }}>
               <div className="panel-head" style={{ marginBottom: "16px" }}>
@@ -485,7 +523,7 @@ export function SettingsView({ games, onRefreshData }: SettingsViewProps) {
                       borderRadius: "10px",
                       fontWeight: 600
                     }}>
-                      v0.5.0
+                      v0.6.0
                     </span>
                   </div>
                   <span style={{ fontSize: "12px", color: "var(--muted)" }}>
