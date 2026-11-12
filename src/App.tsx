@@ -21,6 +21,7 @@ import { TrainingDesk } from "./components/TrainingDesk";
 import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
 import { AnalyticsView } from "./components/AnalyticsView";
+import { OpeningsView } from "./components/OpeningsView";
 import { useAuth } from "./lib/auth";
 import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
@@ -587,7 +588,14 @@ function App() {
             onNavigateToTrain={() => setPage("Train")}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && (
+        {page === "Openings" && (
+          <OpeningsView
+            userId={user?.id}
+            games={games}
+            onOpenAnalysis={openAnalysisForGame}
+          />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>

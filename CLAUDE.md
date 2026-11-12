@@ -7,14 +7,15 @@ Full documentation resides in `docs/` and `ChessForge Documentation Set.md`.
 Read `docs/ROADMAP.md` to see the roadmap and milestones.
 
 ## Current Phase
-Phase 7: Opening Repertoires (Current Active Phase).
+Phase 8: Endgame Lab & Calculation (next phase — Phase 7 complete).
 - Phase 1 (Foundation): Complete & signed off.
 - Phase 2 (Data Ingestion & Integrity): Complete & signed off.
 - Phase 3 (Analysis Pipeline): Complete & signed off.
 - Phase 4 (Continuous Training Loop): Complete & signed off at `v1.0.0`.
 - Phase 5 (Insight & Weakness Diagnosis): Complete & signed off at `v0.5.0`.
 - Phase 6 (Platform Integrations): Complete & signed off at `v0.6.0`.
-- Phase 7 (Current): Opening repertoires for White and Black, tree visualization, practice drilling, game deviation alerts — target `v0.7.0`.
+- Phase 7 (Opening Repertoires): Complete & signed off at `v0.7.0` — Repertoire trees for White/Black, practice recall drilling, game deviation scanner.
+- Phase 8 (Next): Endgame Lab & Calculation — `v0.8.0`.
 
 ## Changelog Policy
 After completing each distinct functional change or milestone, record a concise single-line entry under `[Unreleased]` in `CHANGELOG.md`. Avoid redundant multi-paragraph status recaps.

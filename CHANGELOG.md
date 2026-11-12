@@ -10,7 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] - 2026-11-12
+
+### Current Status
+- **Phase:** Phase 7 (Opening Repertoires) — ✅ **Signed off**
+- **Branch:** `phase-7/opening-repertoires` merged to `main`
+- **Tag:** `v0.7.0`
+
 ### Added
+- **Opening Repertoires Studio (`src/components/OpeningsView.tsx`)**: Full opening repertoire management for White and Black with tree explorer, move notation breadcrumb, candidate line navigator, and move notes editor.
+- **Repertoire Tree Engine (`src/lib/openings/repertoire-tree.ts`)**: Tree data structure with normalized FEN (EPD) transposition support, multi-branching lines, PGN import to tree, and PGN export with parenthesized sub-variations.
+- **Active Recall Repertoire Drilling (`src/lib/openings/repertoire-drill.ts`)**: Interactive drilling engine walking repertoire trees, playing opponent responses, validating user choices, and tracking accuracy.
+- **Game Deviation Detector (`src/lib/openings/deviation-detector.ts`)**: Scans library games against White and Black repertoires, flagging the exact move and ply where the player left preparation.
+- **Supabase Migration 000007 (`supabase/migrations/20261112000007_phase7_opening_repertoires.sql`)**: `opening_repertoires` and `opening_lines` tables with Row Level Security (RLS) and indexed lookups.
+- **ADR-0013 (`docs/decisions/0013-opening-repertoires-architecture.md`)**: Documents the tree architecture, dual-layer storage, drill evaluation, and deviation scanning decisions.
+- **10 new unit tests (`tests/unit/openings.test.ts`)**: Tests tree building, FEN normalization, PGN import/export, interactive drilling, and deviation detection (total test suite at 85/85 passing).
 - **Auto-Sync Service** (`src/lib/sync/auto-sync.ts`): Performs automatic background game sync daily on app launch (gated by UTC calendar day) and provides on-demand multi-account sync. Seeds accounts from profile editor ratings if not yet initialized.
 - **"Sync Games" Global Toolbar & Library Buttons**: Easily accessible "Sync Games" button with spin animation and toast status messages placed in the top workspace toolbar and inside `GameLibrary` ("My Games").
 - **Auto-Sync Unit Tests** (`tests/unit/auto-sync.test.ts`): 6 unit tests covering daily gating, on-demand execution, profile rating migration seeding, and error isolation.

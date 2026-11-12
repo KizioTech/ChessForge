@@ -152,19 +152,19 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 7: Opening Repertoires (R3)
-- **Status:** 🔄 In Progress (Active Development Phase)
+- **Status:** ✅ Complete (Signed off — target `v0.7.0`)
 - **Release Target:** `v0.7.0`
 - **Scope:** Opening repertoire trees for White and Black, practice drilling, game deviation alerts.
 - **Exit Criteria:**
-  - [ ] Database migration `000007_phase7_opening_repertoires.sql` creating `opening_repertoires` and `opening_lines` with RLS.
-  - [ ] Pure TypeScript repertoire service (`src/lib/openings/`) with dual-layer persistence (Supabase + localStorage fallback).
-  - [ ] Tree data structure supporting multi-branching lines, transpositions, moves commentary, and PGN import/export.
-  - [ ] Interactive Openings UI (`src/components/OpeningsView.tsx`) with visual tree navigator, board moves input, and line management.
-  - [ ] Interactive Repertoire Drill Mode: test knowledge by playing against opponent lines with immediate feedback.
-  - [ ] Game Deviation Scanner: analyzes user library games against White/Black repertoires and flags the first move out of book.
-  - [ ] Architecture Decision Record `ADR-0013` recorded in `docs/decisions/`.
-  - [ ] Unit tests covering tree building, PGN import/export, drilling evaluation, and game deviation scanning.
-  - [ ] `tsc --noEmit: 0 errors` and all automated tests passing cleanly.
+  - [x] Database migration `000007_phase7_opening_repertoires.sql` creating `opening_repertoires` and `opening_lines` with RLS.
+  - [x] Pure TypeScript repertoire service (`src/lib/openings/`) with dual-layer persistence (Supabase + localStorage fallback).
+  - [x] Tree data structure supporting multi-branching lines, transpositions, moves commentary, and PGN import/export.
+  - [x] Interactive Openings UI (`src/components/OpeningsView.tsx`) with visual tree navigator, board moves input, and line management.
+  - [x] Interactive Repertoire Drill Mode: test knowledge by playing against opponent lines with immediate feedback.
+  - [x] Game Deviation Scanner: analyzes user library games against White/Black repertoires and flags the first move out of book.
+  - [x] Architecture Decision Record `ADR-0013` recorded in `docs/decisions/`.
+  - [x] Unit tests covering tree building, PGN import/export, drilling evaluation, and game deviation scanning (10 tests).
+  - [x] `tsc --noEmit: 0 errors` and 85/85 automated tests passing cleanly.
 
 ---
 
@@ -207,7 +207,7 @@ Before closing any phase, every item below must be satisfied:
 | **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v0.4.0` (The Loop) |
 | **Phase 5** | Insight & Weakness Diagnosis | ✅ **Complete** | Signed off — `v0.5.0` |
 | **Phase 6** | Platform Integrations | ✅ **Complete** | Signed off — `v0.6.0` |
-| **Phase 7** | Opening Repertoires | 🔄 **Active** | Opening trees, drilling, deviation alerts — target `v0.7.0` |
+| **Phase 7** | Opening Repertoires | ✅ **Complete** | Signed off — `v0.7.0` |
 | **Phase 8** | Endgame Lab & Calculation | **Locked** | Future milestone |
 | **Phase 9** | Desktop Packaging | ✅ **Complete** | Shipped early — `v0.4.0` public installer |
 | **Phase 10** | Multi-User & Public Readiness | **Locked** | Post-v2.0.0 |
