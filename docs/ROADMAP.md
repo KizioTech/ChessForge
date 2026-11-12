@@ -1,4 +1,4 @@
-# ChessForge Phased Roadmap
+﻿# ChessForge Phased Roadmap
 
 **Version:** 1.1 · 3 November 2026  
 **Status:** Active  
@@ -136,14 +136,18 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 6: Platform Integrations (R2)
-- **Status:** In Progress (Current Active Dev Phase — Phase 5 signed off)
+- **Status:** ✅ Complete (Signed off — commit `b1e70a0`, release `v0.6.0`)
 - **Release Target:** `v0.6.0`
 - **Scope:** Automated sync from Chess.com (monthly archives + ETags) and Lichess (rate-limited stream API), background sync checkpoints and logging.
 - **Exit Criteria:**
-  - [ ] Sync operates automatically for Chess.com and Lichess accounts.
-  - [ ] Rate limits handled gracefully (429 exponential backoff, minimum 60s cooldown).
-  - [ ] Deduplication verified: subsequent sync imports only new games with zero duplicates.
-  - [ ] Resumable checkpoints written to `import_logs`.
+  - [x] Sync operates automatically for Chess.com and Lichess accounts.
+  - [x] Rate limits handled gracefully (429 exponential backoff, minimum 60s cooldown).
+  - [x] Deduplication verified: subsequent sync imports only new games with zero duplicates.
+  - [x] Resumable checkpoints written to `import_logs`.
+  - [x] ProfileModal saves upsert `platform_accounts` rows (bridge fix for existing users).
+  - [x] PlatformSyncView seeds from profile localStorage on first load; displays live ELO (Rapid/Blitz/Bullet).
+  - [x] DB migration `000006` for `import_logs` table with RLS; ADR `0012` recorded.
+  - [x] 10/10 adapter unit tests passing; `tsc --noEmit: 0 errors`; `npm run build` clean.
 
 ---
 
@@ -192,7 +196,7 @@ Before closing any phase, every item below must be satisfied:
 | **Phase 3** | Analysis Engine | ✅ **Complete** | Signed off — `v0.3.0` |
 | **Phase 4** | Mistakes & Exercises | ✅ **Complete** | Signed off — `v0.4.0` (The Loop) |
 | **Phase 5** | Insight & Weakness Diagnosis | ✅ **Complete** | Signed off — `v0.5.0` |
-| **Phase 6** | Platform Integrations | 🔄 **Active** | Chess.com PubAPI & Lichess stream sync — target `v0.6.0` |
+| **Phase 6** | Platform Integrations | ✅ **Complete** | Signed off — `v0.6.0` |
 | **Phase 7** | Opening Repertoires | **Locked** | Future milestone |
 | **Phase 8** | Endgame Lab & Calculation | **Locked** | Future milestone |
 | **Phase 9** | Desktop Packaging | ✅ **Complete** | Shipped early — `v0.4.0` public installer |
