@@ -26,6 +26,46 @@ export interface TheoreticalMoveOption {
   targetFen: string;
 }
 
+export interface EcoCategoryMeta {
+  code: "A" | "B" | "C" | "D" | "E";
+  name: string;
+  description: string;
+  examples: string;
+}
+
+export const ECO_CATEGORIES: EcoCategoryMeta[] = [
+  {
+    code: "A",
+    name: "Flank & Irregular Openings",
+    description: "Flank openings and systems not starting with 1.e4 or 1.d4, plus the Dutch Defense.",
+    examples: "English, Réti, Bird, Dutch, Benoni",
+  },
+  {
+    code: "B",
+    name: "Semi-Open Games",
+    description: "1.e4 where Black responds with moves other than 1...e5.",
+    examples: "Sicilian, Caro-Kann, Scandinavian, Pirc, Alekhine",
+  },
+  {
+    code: "C",
+    name: "Open Games & French",
+    description: "1.e4 e5 (Double King Pawn) and the French Defense.",
+    examples: "Ruy Lopez, Italian, Scotch, Petroff, French Defense, King's Gambit",
+  },
+  {
+    code: "D",
+    name: "Closed Games & Semi-Slav",
+    description: "1.d4 d5 (Double Queen Pawn) plus the Grünfeld Defense.",
+    examples: "Queen's Gambit, Slav Defense, Semi-Slav, Grünfeld, London System",
+  },
+  {
+    code: "E",
+    name: "Indian Defenses",
+    description: "1.d4 Nf6 with early ...e6 or ...g6 setups.",
+    examples: "King's Indian, Nimzo-Indian, Queen's Indian, Bogo-Indian, Catalan",
+  },
+];
+
 let _openingBookPromise: Promise<{
   book: Record<string, any>;
   positionBook: Record<string, string[]>;
@@ -178,3 +218,69 @@ export async function searchEcoOpenings(
     return [];
   }
 }
+
+export interface GetOpeningsListOptions {
+  category?: "A" | "B" | "C" | "D" | "E" | "all";
+  query?: string;
+  rootsOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Fetch a structured, filterable list of openings with pagination.
+ */
+export async function getOpeningsList(
+  options: GetOpeningsListOptions = {}
+): Promise<{ items: EcoOpeningInfo[]; total: number }> {
+  const { category = "all", query = "", rootsOnly = false, limit = 50, offset = 0 } = options;
+  const q = query.trim().toLowerCase();
+
+  try {
+    const { book, ecoModule } = await getOpeningBookInstance();
+    if (!ecoModule || Object.keys(book).length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    let sourceList: any[] = [];
+
+    if (rootsOnly) {
+      const roots = await ecoModule.getEcoRoots();
+      sourceList = Object.values(roots);
+    } else if (category !== "all") {
+      sourceList = await ecoModule.getOpeningsByEcoCategory(category, book);
+    } else {
+      sourceList = Object.values(book);
+    }
+
+    // Filter by category if rootsOnly was used but a specific category was chosen
+    if (category !== "all" && rootsOnly) {
+      sourceList = sourceList.filter(op => op.eco?.startsWith(category));
+    }
+
+    // Filter by query if provided
+    if (q) {
+      sourceList = sourceList.filter(
+        op =>
+          op.name?.toLowerCase().includes(q) ||
+          op.eco?.toLowerCase() === q ||
+          op.moves?.toLowerCase().includes(q)
+      );
+    }
+
+    const total = sourceList.length;
+    const paginated = sourceList.slice(offset, offset + limit).map((op: any) => ({
+      name: op.name,
+      eco: op.eco,
+      moves: op.moves,
+      fen: op.fen,
+      isEcoRoot: op.isEcoRoot,
+    }));
+
+    return { items: paginated, total };
+  } catch (err) {
+    console.warn("[ECO Book] getOpeningsList error:", err);
+    return { items: [], total: 0 };
+  }
+}
+

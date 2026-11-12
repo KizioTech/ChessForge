@@ -279,4 +279,26 @@ describe("ECO Opening Book Integration (@chess-openings/eco.json)", () => {
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].name.toLowerCase()).toContain("caro-kann");
   });
+
+  it("browses openings list with category and rootsOnly filters", async () => {
+    const { getOpeningsList } = await import("../../src/lib/openings");
+    
+    // Canonical roots only
+    const rootsResult = await getOpeningsList({ rootsOnly: true, limit: 10 });
+    expect(rootsResult.total).toBeGreaterThan(400);
+    expect(rootsResult.items.length).toBe(10);
+    expect(rootsResult.items[0].isEcoRoot).toBe(true);
+
+    // Filter by ECO Category B (Semi-Open)
+    const catBResult = await getOpeningsList({ category: "B", rootsOnly: true, limit: 5 });
+    expect(catBResult.items.length).toBe(5);
+    for (const item of catBResult.items) {
+      expect(item.eco.startsWith("B")).toBe(true);
+    }
+
+    // Search query within list
+    const searchResult = await getOpeningsList({ query: "French", limit: 5 });
+    expect(searchResult.items.length).toBeGreaterThan(0);
+    expect(searchResult.items[0].name.toLowerCase()).toContain("french");
+  });
 });
