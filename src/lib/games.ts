@@ -133,7 +133,9 @@ export async function saveParsedGames(
     const record: GameRecord = {
       id: crypto.randomUUID ? crypto.randomUUID() : `game_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       user_id: userId || undefined,
-      platform: g.headers.Site?.toLowerCase().includes("lichess")
+      platform: source === "chesscom" || source === "lichess"
+        ? source
+        : g.headers.Site?.toLowerCase().includes("lichess")
         ? "lichess"
         : g.headers.Site?.toLowerCase().includes("chess.com")
         ? "chesscom"

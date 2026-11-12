@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Auto-Sync Service** (`src/lib/sync/auto-sync.ts`): Performs automatic background game sync daily on app launch (gated by UTC calendar day) and provides on-demand multi-account sync. Seeds accounts from profile editor ratings if not yet initialized.
+- **"Sync Games" Global Toolbar & Library Buttons**: Easily accessible "Sync Games" button with spin animation and toast status messages placed in the top workspace toolbar and inside `GameLibrary` ("My Games").
+- **Auto-Sync Unit Tests** (`tests/unit/auto-sync.test.ts`): 6 unit tests covering daily gating, on-demand execution, profile rating migration seeding, and error isolation.
+
+### Fixed
+- **Chess.com ongoing month incremental sync**: `ChesscomAdapter` now keeps the ongoing/latest month archive open for incremental sync using `If-None-Match` ETags rather than permanently locking it into `completedUrls`, ensuring new games played during the current month are continuously imported.
+- **Player colour detection**: `sync-engine.ts` now uses `account.username` for player colour detection during PGN parsing, guaranteeing user games are tagged as `"white"` or `"black"` rather than `"unknown"` even when the logged-in email differs from the platform handle.
+- **Platform column integrity**: `saveParsedGames` in `src/lib/games.ts` now sets `platform: source` when source is `"chesscom"` or `"lichess"`, guaranteeing newly synced games are categorized under their respective platform in the `games` table and filters.
+
 ---
 
 ## [0.6.0] - 2026-11-12

@@ -115,10 +115,12 @@ export async function runSync(
       }
 
       if (page.games.length > 0) {
-        // Reconstruct a PGN blob for the parser (each game separated by blank line)
+        // Reconstruct a PGN blob for the parser (each game separated by blank line).
+        // Use the platform account's username for player colour detection (white/black).
         const pgnBlob = page.games.map(g => g.pgn).join("\n\n");
+        const colourDetectionUsername = account.username || username;
 
-        const { games: parsed } = await parsePgn(pgnBlob, username);
+        const { games: parsed } = await parsePgn(pgnBlob, colourDetectionUsername);
 
         const saveResult = await saveParsedGames(
           parsed,

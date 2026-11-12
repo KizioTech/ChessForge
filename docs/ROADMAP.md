@@ -1,4 +1,4 @@
-﻿# ChessForge Phased Roadmap
+# ChessForge Phased Roadmap
 
 **Version:** 1.1 · 3 November 2026  
 **Status:** Active  
