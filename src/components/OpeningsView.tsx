@@ -28,6 +28,7 @@ import {
   BookOpenCheck
 } from "lucide-react";
 import { BoardView } from "./BoardView";
+import { useExplorer } from "../lib/openings/use-explorer";
 import type { GameRecord } from "../lib/games";
 import {
   type RepertoireRecord,
@@ -78,41 +79,6 @@ interface OpeningsViewProps {
 }
 
 // ── Lichess Opening Explorer hook ────────────────────────────────────────────
-
-interface ExplorerMove {
-  uci: string;
-  san: string;
-  white: number;
-  draws: number;
-  black: number;
-  averageRating?: number;
-}
-
-interface ExplorerData {
-  white: number;
-  draws: number;
-  black: number;
-  moves: ExplorerMove[];
-}
-
-function useExplorer(fen: string | null): { data: ExplorerData | null; loading: boolean } {
-  const [data, setData] = useState<ExplorerData | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!fen) { setData(null); return; }
-    let cancelled = false;
-    setLoading(true);
-    const url = `https://explorer.lichess.org/lichess?fen=${encodeURIComponent(fen)}&speeds=blitz,rapid&ratings=1200,1400,1600,1800`;
-    fetch(url)
-      .then(r => r.json())
-      .then((d: ExplorerData) => { if (!cancelled) { setData(d); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, [fen]);
-
-  return { data, loading };
-}
 
 // ── Win percentage bar components ─────────────────────────────────────────────
 
@@ -986,7 +952,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {candidateMoves.map(candidate => {
-                    const expMove = explorer.data?.moves.find(m => m.san === candidate.san);
+                    const expMove = explorer.data?.moves?.find(m => m.san === candidate.san);
                     return (
                       <div
                         key={candidate.id}
@@ -1036,6 +1002,12 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
                 </div>
               )}
             </div>
+
+            {explorer.error && (
+              <div className="panel" role="status" style={{ padding: "10px 14px", fontSize: "12px", color: "var(--muted)" }}>
+                Move statistics unavailable: {explorer.error} Opening names and theory still work offline.
+              </div>
+            )}
 
             {/* POPULAR DATABASE MOVES & WIN RATES (LICHESS) */}
             {explorer.data && explorer.data.moves && explorer.data.moves.length > 0 && (
@@ -1118,7 +1090,7 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {theoreticalTransitions.map((t, idx) => {
-                    const expMove = explorer.data?.moves.find(m => m.san === t.san);
+                    const expMove = explorer.data?.moves?.find(m => m.san === t.san);
                     const total = expMove ? expMove.white + expMove.draws + expMove.black : 0;
                     return (
                       <div
