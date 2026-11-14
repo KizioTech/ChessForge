@@ -13,6 +13,10 @@ interface BoardViewProps {
   onMove?: (from: Square, to: Square, promotion?: "q" | "r" | "b" | "n") => void;
   interactive?: boolean;
   maxWidth?: number | string;
+  /** Highlight the last move played, as [from, to] squares. */
+  lastMove?: [string, string] | null;
+  /** Arrows drawn on the board (for example a hint or the engine's best move). */
+  shapes?: { orig: string; dest: string; brush: string }[];
 }
 
 function toDests(chess: Chess): Map<Key, Key[]> {
@@ -32,7 +36,9 @@ export function BoardView({
   orientation = "white",
   onMove,
   interactive = true,
-  maxWidth = "100%"
+  maxWidth = "100%",
+  lastMove = null,
+  shapes = []
 }: BoardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cgRef = useRef<Api | null>(null);
@@ -70,6 +76,7 @@ export function BoardView({
         orientation,
         turnColor: turn,
         check: game.inCheck(),
+        lastMove: lastMove ? (lastMove as Key[]) : undefined,
         movable: {
           free: false,
           color: interactive && !game.isGameOver() ? turn : undefined,
@@ -90,6 +97,7 @@ export function BoardView({
         drawable: {
           enabled: true,         // allow user drawings
           visible: true,
+          autoShapes: shapes as any,
           defaultSnapToValidMove: true,
           eraseOnClick: true,    // left-click clears all shapes
           brushes: {
@@ -106,16 +114,19 @@ export function BoardView({
         orientation,
         turnColor: turn,
         check: game.inCheck(),
+        // the key must be present (even if undefined) so Chessground clears a stale highlight
+        lastMove: lastMove ? (lastMove as Key[]) : undefined,
         movable: {
           color: interactive && !game.isGameOver() ? turn : undefined,
           dests,
           events: {
             after: handleMove
           }
-        }
+        },
+        drawable: { autoShapes: shapes as any }
       });
     }
-  }, [game, orientation, interactive, handleMove]);
+  }, [game, orientation, interactive, handleMove, lastMove, shapes]);
 
   // Redraw Chessground on container resize (e.g. sidebar toggle or window resize)
   useEffect(() => {

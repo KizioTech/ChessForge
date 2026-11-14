@@ -1,4 +1,5 @@
 import React from "react";
+import pkg from "../../package.json";
 import {
   Activity,
   BarChart3,
@@ -186,7 +187,7 @@ export function Sidebar({
             fontWeight: 600,
             letterSpacing: "0.5px"
           }}>
-            v0.5.0
+            v{pkg.version}
           </span>
         </div>
       </div>

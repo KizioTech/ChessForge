@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Learn Openings & Opening Library (Learn First, Repertoire Second)**: Introduced dedicated `OpeningsHub` separating opening study into **Learn Openings** (default) and **My Repertoire**:
+  - **Opening Library Browser (`OpeningLibrary.tsx`)**: 149 opening families with variation trees, cards with White/Black indicators, ECO ranges, line counts, search, and progress tracking.
+  - **Interactive Opening Study & Practise (`OpeningDetail.tsx`)**: Study mode with forward/back navigation, theory continuations, and move replacement; Practise mode with memory testing, automatic opponent responses, hint arrows, mistake tracking, and mastery progression (3 consecutive clean runs).
+  - **Collapsible Variation Tree (`VariationTree.tsx`)**: Tree navigation by variation depth with progress indicators (mastered checkmarks, learning dots).
+  - **Repertoire Promotion Gate**: One-click addition of mastered lines to White/Black repertoires via existing repertoire services.
+  - **Dynamic Sidebar Version Badge**: Displays active version dynamically from `package.json`.
 - **Opening Studio 3-Column Layout & Move Notation Panel**: Redesigned Repertoire Studio into a clean 3-column workspace:
   - **Column 1 (Interactive Board & Navigation)**: Responsive board with quick-jump navigation (`⏮ Start`, `◀ Back`, `🔄 Flip`, `↺ Reset`), turn indicator, and PGN / ECO search actions.
   - **Column 2 (Move List & Position Details)**: PGN-style scrollable notation pairs with live move tracking, recognized opening ECO badge and full name, and selective move notes editor.

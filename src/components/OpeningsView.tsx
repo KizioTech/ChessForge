@@ -76,6 +76,8 @@ interface OpeningsViewProps {
   userId?: string | null;
   games: GameRecord[];
   onOpenAnalysis?: (game: GameRecord) => void;
+  /** Switch to the Learn section (the opening library). */
+  onBrowseOpenings?: () => void;
 }
 
 // ── Lichess Opening Explorer hook ────────────────────────────────────────────
@@ -114,7 +116,7 @@ function WinBarLabels({ white, draws, black }: { white: number; draws: number; b
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProps) {
+export function OpeningsView({ userId, games, onOpenAnalysis, onBrowseOpenings }: OpeningsViewProps) {
   const [repertoires, setRepertoires] = useState<RepertoireRecord[]>([]);
   const [activeSide, setActiveSide] = useState<RepertoireSide>("white");
   const [activeTab, setActiveTab] = useState<"build" | "drill" | "deviations" | "list">("build");
@@ -677,11 +679,11 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
       <div className="welcome-row" style={{ marginBottom: "16px" }}>
         <div>
           <div className="eyebrow">
-            <BookOpen size={13} /> OPENING REPERTOIRES (PHASE 7)
+            <BookOpen size={13} /> MY REPERTOIRE
           </div>
-          <h1>Repertoire Studio</h1>
+          <h1>My repertoire</h1>
           <p className="subheading">
-            Build White and Black repertoire trees, practice active recall, and identify game deviations.
+            The lines you have chosen to play. Learn and master openings first, then add them here to drill them and to see where your games leave your preparation.
           </p>
         </div>
 
@@ -736,12 +738,28 @@ export function OpeningsView({ userId, games, onOpenAnalysis }: OpeningsViewProp
         </button>
         <button
           className={`tab-btn ${activeTab === "list" ? "active" : ""}`}
-          onClick={() => { setActiveTab("list"); setDrillActive(false); }}
+          onClick={() => {
+            if (onBrowseOpenings) { onBrowseOpenings(); return; }
+            setActiveTab("list"); setDrillActive(false);
+          }}
           style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", border: "none", background: "none", cursor: "pointer", color: activeTab === "list" ? "var(--lime)" : "var(--muted)", fontWeight: activeTab === "list" ? 600 : 400 }}
         >
-          <List size={14}/> Openings Directory
+          <List size={14}/> {onBrowseOpenings ? "Browse openings" : "Openings Directory"}
         </button>
       </div>
+
+      {!loading && lines.length === 0 && onBrowseOpenings && activeTab !== "list" && (
+        <div className="panel" role="status" style={{ padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: "240px" }}>
+            <strong style={{ fontSize: "14px" }}>Your {activeSide} repertoire is empty.</strong>
+            <p style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px", lineHeight: 1.5 }}>
+              A repertoire is for lines you already know. Start in the opening library, practise a line until you have
+              it down, then add it here.
+            </p>
+          </div>
+          <button className="button button-primary" onClick={onBrowseOpenings}>Browse openings</button>
+        </div>
+      )}
 
       {/* ── Mode 1: Repertoire Tree Builder ──────────────────────────────── */}
       {activeTab === "build" && (

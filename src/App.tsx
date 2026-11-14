@@ -21,7 +21,7 @@ import { TrainingDesk } from "./components/TrainingDesk";
 import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
 import { AnalyticsView } from "./components/AnalyticsView";
-import { OpeningsView } from "./components/OpeningsView";
+import { OpeningsHub } from "./components/OpeningsHub";
 import { useAuth } from "./lib/auth";
 import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
@@ -589,7 +589,7 @@ function App() {
           />
         )}
         {page === "Openings" && (
-          <OpeningsView
+          <OpeningsHub
             userId={user?.id}
             games={games}
             onOpenAnalysis={openAnalysisForGame}
