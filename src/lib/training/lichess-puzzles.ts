@@ -55,22 +55,49 @@ export function savePuzzleCache(puzzles: LichessPuzzle[]): void {
  * Replay a PGN string up to the given ply index (0-based half-moves)
  * and return the resulting FEN.
  */
-export function extractFenAtPly(pgn: string, ply: number): string | null {
+export function extractFenAtPly(pgn: string, ply?: number): string | null {
   try {
-    if (!pgn || pgn.trim().length === 0) {
-      return new Chess().fen();
+    const c = new Chess();
+    if (!pgn || !pgn.trim()) return c.fen();
+
+    // Clean comments, NAGs, variations, headers
+    const cleaned = pgn
+      .replace(/\{[^}]*\}/g, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/\$[0-9]+/g, " ")
+      .trim();
+
+    // First attempt: standard loadPgn
+    try {
+      c.loadPgn(cleaned, { strict: false });
+      const history = c.history({ verbose: true });
+      if (history.length > 0) {
+        const limit = (ply !== undefined && ply > 0) ? Math.min(ply, history.length) : history.length;
+        const replay = new Chess();
+        for (let i = 0; i < limit; i++) {
+          replay.move(history[i].san);
+        }
+        return replay.fen();
+      }
+    } catch {
+      // Fallback to manual token parsing
     }
-    const chess = new Chess();
-    // Load full PGN
-    chess.loadPgn(pgn, { strict: false });
-    const history = chess.history({ verbose: true });
-    
-    // Reset and replay up to ply
-    const start = new Chess();
-    for (let i = 0; i < ply && i < history.length; i++) {
-      start.move(history[i].san);
+
+    // Fallback: parse tokens manually
+    const tokens = cleaned.split(/\s+/);
+    const moves: string[] = [];
+    for (const t of tokens) {
+      if (!t || t.includes(".") || t === "*" || t === "1-0" || t === "0-1" || t === "1/2-1/2") continue;
+      moves.push(t);
     }
-    return start.fen();
+
+    const replay = new Chess();
+    const limit = (ply !== undefined && ply > 0) ? Math.min(ply, moves.length) : moves.length;
+    for (let i = 0; i < limit; i++) {
+      const res = replay.move(moves[i]);
+      if (!res) break;
+    }
+    return replay.fen();
   } catch {
     return null;
   }
@@ -87,7 +114,11 @@ export async function fetchDailyPuzzle(): Promise<LichessPuzzle | null> {
     const p = data.puzzle;
     const g = data.game;
     if (!p) return null;
-    const fen = extractFenAtPly(g?.pgn ?? "", p?.initialPly ?? 0);
+    // Prefer p.fen if provided directly by Lichess, otherwise replay PGN
+    let fen = p.fen;
+    if (!fen || fen.trim().length === 0) {
+      fen = extractFenAtPly(g?.pgn ?? "", p?.initialPly);
+    }
     if (!fen) return null;
     return {
       id: p.id,
@@ -113,13 +144,16 @@ export async function fetchPuzzleBatch(nb = 20, themes: string[] = []): Promise<
     if (!res.ok) return [];
     const data = await res.json();
     const rawPuzzles: Array<{
-      puzzle: { id: string; rating: number; themes: string[]; solution: string[]; initialPly: number };
+      puzzle: { id: string; rating: number; themes: string[]; solution: string[]; initialPly?: number; fen?: string };
       game: { pgn: string };
     }> = data.puzzles ?? [];
     
     const result: LichessPuzzle[] = [];
     for (const item of rawPuzzles) {
-      const fen = extractFenAtPly(item.game?.pgn ?? "", item.puzzle?.initialPly ?? 0);
+      let fen: string | null = item.puzzle.fen ?? null;
+      if (!fen || fen.trim().length === 0) {
+        fen = extractFenAtPly(item.game?.pgn ?? "", item.puzzle?.initialPly);
+      }
       if (!fen) continue;
       result.push({
         id: item.puzzle.id,
@@ -141,25 +175,25 @@ export const FALLBACK_PUZZLES: LichessPuzzle[] = [
   {
     id: "offline-1",
     rating: 1350,
-    themes: ["endgame", "mate", "mateIn1"],
-    initialFen: "6k1/5ppp/8/8/8/8/5PPP/1r4K1 w - - 0 1",
-    solution: ["b1b8"],
+    themes: ["endgame", "mate", "mateIn1", "backRankMate"],
+    initialFen: "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1",
+    solution: ["e1e8"],
     pgn: ""
   },
   {
     id: "offline-2",
     rating: 1420,
     themes: ["fork", "middlegame", "advantage"],
-    initialFen: "r1bqk2r/pppp1ppp/2n5/4p3/1b2n3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 6",
-    solution: ["c1d2", "b4c3", "b2c3"],
+    initialFen: "r2q1rk1/ppp2ppp/8/3n4/8/2N5/PPP2PPP/R2Q1RK1 w - - 0 1",
+    solution: ["c3d5"],
     pgn: ""
   },
   {
     id: "offline-3",
     rating: 1550,
-    themes: ["skewer", "endgame", "rookEndgame"],
-    initialFen: "8/8/8/8/4k3/8/1r6/R3K3 b - - 0 1",
-    solution: ["e4d3", "a1a3", "d3c2"],
+    themes: ["endgame", "pawnEndgame", "promotion"],
+    initialFen: "8/4P3/8/8/4k3/8/8/4K3 w - - 0 1",
+    solution: ["e7e8q"],
     pgn: ""
   }
 ];

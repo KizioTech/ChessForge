@@ -231,7 +231,7 @@ function App() {
     return () => clearTimeout(tid);
   }, [user?.id, handleSyncGames]);
 
-  function openAnalysisForGame(gameRecord: GameRecord) {
+  function openAnalysisForGame(gameRecord: GameRecord, targetPly?: number) {
     // Clear prior analysis state whenever a new game is loaded
     setAnalysisPositions([]);
     setMoveReports([]);
@@ -243,7 +243,10 @@ function App() {
       chess.loadPgn(gameRecord.pgn, { strict: false });
       const sanMoves = chess.history();
       setMoves(sanMoves);
-      setHistoryIndex(sanMoves.length);
+      const targetIndex = (targetPly !== undefined && targetPly >= 0 && targetPly <= sanMoves.length)
+        ? targetPly
+        : sanMoves.length;
+      setHistoryIndex(targetIndex);
       setOrientation(gameRecord.user_colour === "black" ? "black" : "white");
       setActiveGame(gameRecord);
       setPage("Analysis");
@@ -603,7 +606,11 @@ function App() {
           />
         )}
         {page === "Endgames" && (
-          <EndgameLab games={games} onBackToDashboard={() => setPage("Dashboard")} />
+          <EndgameLab
+            games={games}
+            onBackToDashboard={() => setPage("Dashboard")}
+            onOpenAnalysis={openAnalysisForGame}
+          />
         )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>

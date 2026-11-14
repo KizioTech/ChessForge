@@ -13,7 +13,8 @@ import {
   Search,
   Filter,
   Check,
-  BookOpen
+  BookOpen,
+  Crosshair
 } from "lucide-react";
 import { BoardView } from "./BoardView";
 import type { GameRecord } from "../lib/games";
@@ -39,6 +40,7 @@ import {
 interface EndgameLabProps {
   games?: GameRecord[];
   onBackToDashboard?: () => void;
+  onOpenAnalysis?: (game: GameRecord, targetPly?: number) => void;
 }
 
 const CATEGORY_LABELS: Record<EndgameCategory, string> = {
@@ -56,7 +58,7 @@ const DIFFICULTY_COLORS: Record<EndgameDifficulty, string> = {
   master: "#ef4444"
 };
 
-export function EndgameLab({ games = [], onBackToDashboard }: EndgameLabProps) {
+export function EndgameLab({ games = [], onBackToDashboard, onOpenAnalysis }: EndgameLabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<EndgameCategory | "all">("all");
   const [difficultyFilter, setDifficultyFilter] = useState<EndgameDifficulty | "all">("all");
@@ -105,7 +107,9 @@ export function EndgameLab({ games = [], onBackToDashboard }: EndgameLabProps) {
         <EndgameDrillRoom
           position={activePosition}
           progress={progress}
+          games={games}
           onBack={() => setSelectedId(null)}
+          onOpenAnalysis={onOpenAnalysis}
           onRecordSuccess={clean => {
             const updated = recordEndgameRun(progress, activePosition.id, clean);
             setProgress(updated);
@@ -131,6 +135,8 @@ export function EndgameLab({ games = [], onBackToDashboard }: EndgameLabProps) {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onSelectPosition={id => setSelectedId(id)}
+          onOpenAnalysis={onOpenAnalysis}
+          games={games}
         />
       )}
     </div>
@@ -155,6 +161,8 @@ interface BrowserProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   onSelectPosition: (id: string) => void;
+  onOpenAnalysis?: (game: GameRecord, targetPly?: number) => void;
+  games?: GameRecord[];
 }
 
 function CurriculumBrowser({
@@ -170,7 +178,9 @@ function CurriculumBrowser({
   setDifficultyFilter,
   searchQuery,
   setSearchQuery,
-  onSelectPosition
+  onSelectPosition,
+  onOpenAnalysis,
+  games = []
 }: BrowserProps) {
   return (
     <div>
@@ -357,13 +367,29 @@ function CurriculumBrowser({
                     </p>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid var(--line)", flexWrap: "wrap", gap: "6px" }}>
                     <span style={{ fontSize: "11px", color: "var(--muted)" }}>
                       Result: {pos.gameResult}
                     </span>
-                    <button className="button button-primary button-small" style={{ fontSize: "11px" }}>
-                      Solve Missed Move →
-                    </button>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {onOpenAnalysis && (
+                        <button
+                          className="button button-secondary button-small"
+                          style={{ fontSize: "11px", gap: "4px" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const g = games.find(gm => gm.id === pos.gameId);
+                            if (g) onOpenAnalysis(g, pos.ply);
+                          }}
+                          title="Open game directly in Analysis workspace at this move"
+                        >
+                          <Crosshair size={12} /> Analyze Game
+                        </button>
+                      )}
+                      <button className="button button-primary button-small" style={{ fontSize: "11px" }}>
+                        Solve Drill →
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -489,7 +515,9 @@ function CurriculumBrowser({
 interface DrillRoomProps {
   position: EndgamePosition;
   progress: EndgameProgressMap;
+  games?: GameRecord[];
   onBack: () => void;
+  onOpenAnalysis?: (game: GameRecord, targetPly?: number) => void;
   onRecordSuccess: (clean: boolean) => void;
   onSelectNext: () => void;
 }
@@ -497,7 +525,9 @@ interface DrillRoomProps {
 function EndgameDrillRoom({
   position,
   progress,
+  games = [],
   onBack,
+  onOpenAnalysis,
   onRecordSuccess,
   onSelectNext
 }: DrillRoomProps) {
@@ -610,7 +640,11 @@ function EndgameDrillRoom({
                 {position.objective === "win" ? "🏆 WINNING DRILL" : "🛡️ DRAWING DEFENSE"}
               </span>
               <strong style={{ fontSize: "14px" }}>
-                {userTurn ? `Your turn as ${position.sideToMove}` : "Opponent replying…"}
+                {state.finished
+                  ? (state.success ? "Drill Completed" : "Drill Incomplete")
+                  : userTurn
+                  ? `Your turn as ${position.sideToMove}`
+                  : "Opponent replying…"}
               </strong>
             </div>
 
@@ -718,13 +752,25 @@ function EndgameDrillRoom({
                   ? "Clean run! No mistakes or hints used. 2 clean runs in a row achieve mastery."
                   : `Finished with ${state.mistakes} mistake(s) and ${state.hintsUsed} hint(s). Keep training to achieve a clean run.`}
               </p>
-              <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
                 <button className="button button-primary button-small" onClick={handleRestart}>
                   Practise Again
                 </button>
                 <button className="button button-secondary button-small" onClick={onSelectNext}>
                   Next Drill →
                 </button>
+                {"gameId" in position && onOpenAnalysis && (
+                  <button
+                    className="button button-secondary button-small"
+                    style={{ gap: "4px" }}
+                    onClick={() => {
+                      const g = games.find(gm => gm.id === (position as MinedEndgamePosition).gameId);
+                      if (g) onOpenAnalysis(g, (position as MinedEndgamePosition).ply);
+                    }}
+                  >
+                    <Crosshair size={12} /> Explore in Analysis →
+                  </button>
+                )}
               </div>
             </div>
           )}

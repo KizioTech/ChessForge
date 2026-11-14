@@ -61,16 +61,8 @@ export function PuzzleTrainer({ onBack }: PuzzleTrainerProps) {
 
     try {
       const c = new Chess(currentPuzzle.initialFen);
-      // Auto-play opponent's initial setup move if solution has moves
-      if (currentPuzzle.solution.length > 0) {
-        const setupUci = currentPuzzle.solution[0];
-        const from = setupUci.slice(0, 2) as Square;
-        const to = setupUci.slice(2, 4) as Square;
-        const promotion = setupUci.length > 4 ? (setupUci[4] as "q" | "r" | "b" | "n") : undefined;
-        c.move({ from, to, promotion });
-      }
       setGame(c);
-      setSolutionIndex(1); // user needs to play solution[1]
+      setSolutionIndex(0); // user starts from solution[0]
       setSolvingStatus("solving");
       setFeedback(null);
       setHintActive(false);
@@ -115,8 +107,15 @@ export function PuzzleTrainer({ onBack }: PuzzleTrainerProps) {
               const oPromo = oppUci.length > 4 ? (oppUci[4] as "q" | "r" | "b" | "n") : undefined;
               tempGame.move({ from: oFrom, to: oTo, promotion: oPromo || "q" });
               setGame(new Chess(tempGame.fen()));
-              setSolutionIndex(nextOpponentIndex + 1);
-              setFeedback(null);
+              const nextUserIndex = nextOpponentIndex + 1;
+              if (nextUserIndex >= currentPuzzle.solution.length) {
+                setSolvingStatus("correct");
+                setFeedback("Splendid! You solved the puzzle!");
+                setSolvedCount(prev => prev + 1);
+              } else {
+                setSolutionIndex(nextUserIndex);
+                setFeedback(null);
+              }
             } catch {
               // fallback
             }
