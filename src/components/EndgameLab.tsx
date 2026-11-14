@@ -12,9 +12,11 @@ import {
   Trophy,
   Search,
   Filter,
-  Check
+  Check,
+  BookOpen
 } from "lucide-react";
 import { BoardView } from "./BoardView";
+import type { GameRecord } from "../lib/games";
 import {
   ENDGAME_CURRICULUM,
   startEndgamePractice,
@@ -26,13 +28,16 @@ import {
   expectedSan,
   isUserTurn,
   isCleanRun,
+  getSavedMinedEndgames,
   type EndgamePosition,
   type EndgameCategory,
   type EndgameDifficulty,
-  type EndgameProgressMap
+  type EndgameProgressMap,
+  type MinedEndgamePosition
 } from "../lib/endgames";
 
 interface EndgameLabProps {
+  games?: GameRecord[];
   onBackToDashboard?: () => void;
 }
 
@@ -51,17 +56,26 @@ const DIFFICULTY_COLORS: Record<EndgameDifficulty, string> = {
   master: "#ef4444"
 };
 
-export function EndgameLab({ onBackToDashboard }: EndgameLabProps) {
+export function EndgameLab({ games = [], onBackToDashboard }: EndgameLabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<EndgameCategory | "all">("all");
   const [difficultyFilter, setDifficultyFilter] = useState<EndgameDifficulty | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [progress, setProgress] = useState<EndgameProgressMap>(() => loadEndgameProgress());
 
-  const activePosition = useMemo(
-    () => ENDGAME_CURRICULUM.find(p => p.id === selectedId) ?? null,
-    [selectedId]
-  );
+  // Mine personal endgame blunders from the user's games
+  const minedPositions = useMemo(() => {
+    return getSavedMinedEndgames(games);
+  }, [games]);
+
+  const activePosition = useMemo(() => {
+    if (!selectedId) return null;
+    return (
+      ENDGAME_CURRICULUM.find(p => p.id === selectedId) ||
+      minedPositions.find(p => p.id === selectedId) ||
+      null
+    );
+  }, [selectedId, minedPositions]);
 
   // Filtered curriculum list
   const filteredPositions = useMemo(() => {
@@ -105,6 +119,7 @@ export function EndgameLab({ onBackToDashboard }: EndgameLabProps) {
       ) : (
         <CurriculumBrowser
           positions={filteredPositions}
+          minedPositions={minedPositions}
           progress={progress}
           totalCount={totalCount}
           masteredCount={masteredCount}
@@ -128,6 +143,7 @@ export function EndgameLab({ onBackToDashboard }: EndgameLabProps) {
 
 interface BrowserProps {
   positions: EndgamePosition[];
+  minedPositions: MinedEndgamePosition[];
   progress: EndgameProgressMap;
   totalCount: number;
   masteredCount: number;
@@ -143,6 +159,7 @@ interface BrowserProps {
 
 function CurriculumBrowser({
   positions,
+  minedPositions,
   progress,
   totalCount,
   masteredCount,
@@ -255,6 +272,112 @@ function CurriculumBrowser({
             }}
           />
         </div>
+      </div>
+
+      {/* Mined Endgame Mistakes from User Games */}
+      {minedPositions.length > 0 && (
+        <div style={{ marginBottom: "2rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+            <ShieldAlert size={18} style={{ color: "#ef4444" }} />
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+              My Endgame Mistakes ({minedPositions.length})
+            </h2>
+            <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+              Endgame positions from your imported games where you missed the winning or drawing technique
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "14px" }}>
+            {minedPositions.map(pos => {
+              const diffColor = DIFFICULTY_COLORS[pos.difficulty];
+              return (
+                <div
+                  key={pos.id}
+                  onClick={() => onSelectPosition(pos.id)}
+                  style={{
+                    background: "rgba(239, 68, 68, 0.05)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    borderRadius: "10px",
+                    padding: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease"
+                  }}
+                  className="endgame-card"
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: "rgba(239, 68, 68, 0.15)",
+                            color: "#ef4444",
+                            border: "1px solid rgba(239, 68, 68, 0.4)"
+                          }}
+                        >
+                          GAME BLUNDER
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: pos.objective === "win" ? "rgba(34, 197, 94, 0.12)" : "rgba(59, 130, 246, 0.12)",
+                            color: pos.objective === "win" ? "#4ade80" : "#60a5fa",
+                            border: pos.objective === "win" ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(59, 130, 246, 0.3)"
+                          }}
+                        >
+                          {pos.objective === "win" ? "🏆 Win" : "🛡️ Draw"}
+                        </span>
+                      </div>
+
+                      <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "capitalize" }}>
+                        {pos.sideToMove} to move
+                      </span>
+                    </div>
+
+                    <strong style={{ fontSize: "1rem", color: "var(--text)", display: "block" }}>
+                      {pos.title}
+                    </strong>
+                    <span style={{ fontSize: "11px", color: "#f87171", display: "block", marginTop: "2px" }}>
+                      Played {pos.playedSan} · Missed winning move
+                    </span>
+
+                    <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--muted)", lineHeight: 1.45 }}>
+                      {pos.description}
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid var(--line)" }}>
+                    <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                      Result: {pos.gameResult}
+                    </span>
+                    <button className="button button-primary button-small" style={{ fontSize: "11px" }}>
+                      Solve Missed Move →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Curriculum Section Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+        <BookOpen size={18} style={{ color: "var(--lime)" }} />
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+          Theoretical Endgame Curriculum ({positions.length})
+        </h2>
       </div>
 
       {/* Grid of Positions */}

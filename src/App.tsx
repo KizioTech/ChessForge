@@ -603,7 +603,7 @@ function App() {
           />
         )}
         {page === "Endgames" && (
-          <EndgameLab onBackToDashboard={() => setPage("Dashboard")} />
+          <EndgameLab games={games} onBackToDashboard={() => setPage("Dashboard")} />
         )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>

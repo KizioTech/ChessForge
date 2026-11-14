@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Open-Source Lichess Puzzle Integration in Training Tab (`src/lib/training/lichess-puzzles.ts`, `src/components/PuzzleTrainer.tsx`, `src/components/TrainingDesk.tsx`)**:
+  - Integrated open-source, CC0-licensed puzzles from Lichess via daily puzzle and batch API endpoints with local caching (`chessforge:lichess-puzzles`) and 24-hour TTL.
+  - Added built-in curated offline fallback puzzle sets ensuring zero interruptions in Electron desktop mode without internet connectivity.
+  - Interactive solving experience: plays the initial opponent setup move automatically, prompts user for the winning tactical sequence, responds to user moves automatically, and provides hints or solution reveals.
+  - Sub-tab navigation in `TrainingDesk` allowing players to seamlessly switch between **My Game Exercises** (SM-2 spaced repetition) and **Lichess Open Puzzles**, with zero dead-ends when their review queue is clear.
+- **Endgame Position Miner & Personal Drills (`src/lib/endgames/endgame-miner.ts`, `src/components/EndgameLab.tsx`)**:
+  - Automated scanner that mines the player's imported game library to isolate endgame positions where the player blundered away an advantage or missed a decisive technical winning/drawing move.
+  - Material heuristic analysis (`isEndgameFen`): accurately detects endgame transitions using non-king piece point sums (≤ 26 points), pawn endgames, or deep plies (≥ 60 plies).
+  - Categorizes mined positions into Pawn, Rook, Minor, or Queen endgames.
+  - Surfaced directly at the top of the **Endgame Lab** under **"My Endgame Mistakes"** with opponent name, game result, win probability dropped, and direct single-move clinical solution drills.
 - **Phase 8: Endgame Lab & Technical Mastery (`src/lib/endgames/`, `src/components/EndgameLab.tsx`)**:
   - Replaced the placeholder page for `Endgames` with a complete interactive **Endgame Lab**.
   - **Curriculum Browser**: 15 essential theoretical positions across 5 core categories:
