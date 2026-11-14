@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 8: Endgame Lab & Technical Mastery (`src/lib/endgames/`, `src/components/EndgameLab.tsx`)**:
+  - Replaced the placeholder page for `Endgames` with a complete interactive **Endgame Lab**.
+  - **Curriculum Browser**: 15 essential theoretical positions across 5 core categories:
+    - *King & Pawn*: Direct Opposition, Key Squares, Rule of the Square, Rook-pawn stalemate trap, Trebuchet mutual zugzwang.
+    - *Rook Endgames*: Lucena Position (Bridge Building on 4th rank), Philidor Position (3rd-rank cutting defense & rear checks), Vancura Defense (side checks on 6th rank).
+    - *Minor Pieces*: Opposite-Colored Bishops Drawing Fortress, Bishop dominating Knight.
+    - *Queen Endgames*: Queen vs c-pawn on 7th rank (corner stalemate defense), Queen vs center pawn.
+    - *Fundamental Checkmates*: King & Queen, King & Rook (Box method), King & Two Bishops.
+  - **Interactive Drill Room**: Real-time board practice where user plays theoretical moves and opponent responds automatically, with hints, theoretical rule cards, and mastery progression (2 clean runs).
+  - **Progress & Mastery Engine (`endgame-progress.ts`)**: Tracks clean runs, attempts, and mastery across sessions.
+  - **Unit Tests (`tests/unit/endgame-lab.test.ts`)**: 4/4 passing tests validating move legality and engine rules.
 - **Intelligent Opening Recommendations & Missed Theory Detection (`src/lib/openings/opening-recommendations.ts`)**:
   - `findMissedTheoryLines()`: Scans player library games to pinpoint positions where the player (not the opponent) deviated from master theory, recording the played move, frequency, W/D/L record, and common book continuations missed (with variation names and line counts).
   - `generateOpeningRecommendations()`: Computes tailored recommendations categorized into:
