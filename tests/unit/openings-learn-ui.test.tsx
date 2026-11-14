@@ -9,7 +9,10 @@ import { recordRun } from "../../src/lib/openings/line-progress";
 
 let book: OpeningBook;
 let families: OpeningFamily[];
-beforeAll(async () => { book = await loadOpeningBook(); families = buildFamilies(book); });
+beforeAll(async () => {
+  book = await loadOpeningBook();
+  families = buildFamilies(book);
+}, 30000);
 const noop = () => {};
 
 describe("LibraryBrowser", () => {

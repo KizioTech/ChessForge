@@ -22,6 +22,7 @@ import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
 import { AnalyticsView } from "./components/AnalyticsView";
 import { OpeningsHub } from "./components/OpeningsHub";
+import { EndgameLab } from "./components/EndgameLab";
 import { useAuth } from "./lib/auth";
 import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
@@ -601,7 +602,10 @@ function App() {
             initialFamily={openingsTargetFamily}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && (
+        {page === "Endgames" && (
+          <EndgameLab onBackToDashboard={() => setPage("Dashboard")} />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>
