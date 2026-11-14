@@ -123,7 +123,7 @@ export function buildFamilies(book: OpeningBook): OpeningFamily[] {
         }
         node = child;
       }
-      // For traps, we preserve the full deep tactical sequence. For regular lines, keep the canonical/shorter one.
+      // Prefer rich, deep theoretical lines (7-12 moves) over truncated 2-4 move stubs.
       const isIncomingTrap = Boolean(line.isTrap || line.name.toLowerCase().includes("trap"));
       const isExistingTrap = Boolean(node.line?.isTrap || node.line?.name.toLowerCase().includes("trap"));
 
@@ -135,19 +135,41 @@ export function buildFamilies(book: OpeningBook): OpeningFamily[] {
         if ((line.moves?.length ?? 0) > (node.line.moves?.length ?? 0)) {
           node.line = line;
         }
-      } else if (!isExistingTrap && (line.moves?.length ?? 99) < (node.line.moves?.length ?? 99)) {
-        node.line = line;
+      } else if (!isExistingTrap) {
+        // Between two theoretical variations sharing the same name, keep the canonical
+        // lower ECO (e.g. B90 over B98 for the Najdorf root node). Only prefer a deeper
+        // line when the names are different — that means it's a richer continuation, not
+        // just another ECO-code alias for the same position.
+        if (line.name === node.line.name) {
+          if (line.eco < node.line.eco) node.line = line;
+        } else if ((line.moves?.length ?? 0) > (node.line.moves?.length ?? 0)) {
+          node.line = line;
+        }
       }
     }
     finishNode(root);
 
-    const mainLine = lines.reduce((best, l) => ((l.moves?.length ?? 99) < (best.moves?.length ?? 99) ? l : best), lines[0]);
+    // Pick a canonical deep mainline representing the family (prefer 12-24 plies / 6-12 full moves)
+    const mainLine = lines.reduce((best, l) => {
+      const lLen = l.moves?.length ?? 0;
+      const bLen = best.moves?.length ?? 0;
+      const lScore = lLen >= 12 && lLen <= 26 ? lLen + 100 : lLen;
+      const bScore = bLen >= 12 && bLen <= 26 ? bLen + 100 : bLen;
+      return lScore > bScore ? l : best;
+    }, lines[0]);
+
+    // sideOfFamily() uses ply-parity for non-Defense families, so it MUST receive the
+    // shortest line's ply count — not the deep mainLine's (which would flip the parity).
+    const shortestLine = lines.reduce(
+      (best, l) => ((l.moves?.length ?? 99) < (best.moves?.length ?? 99) ? l : best),
+      lines[0]
+    );
     const ecos = lines.map(l => l.eco).sort();
     const realLines = leafLines(root);
     const trapCount = realLines.filter(l => l.isTrap || l.name.toLowerCase().includes("trap")).length;
     families.push({
       name,
-      side: sideOfFamily(name, mainLine.moves?.length ?? 1),
+      side: sideOfFamily(name, shortestLine.moves?.length ?? 1),
       ecoMin: ecos[0],
       ecoMax: ecos[ecos.length - 1],
       lineCount: root.lineCount,
