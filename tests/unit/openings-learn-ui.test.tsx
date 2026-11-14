@@ -44,7 +44,7 @@ describe("OpeningDetail", () => {
     expect(html).toContain("Najdorf Variation");
     expect(html).toContain("Study");
     expect(html).toContain("Practise");
-    expect(html).toContain("Master this one first");
+    expect(html).toContain("Master this line first");
     expect(html).toContain("THEORY CONTINUES WITH");
   });
 

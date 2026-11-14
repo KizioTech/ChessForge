@@ -50,8 +50,9 @@
 .ol-back { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--soft); font-size: 13px; padding: 0; margin-bottom: 8px; cursor: pointer; }
 .ol-back:hover { color: var(--lime); }
 .ol-side-pick { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.ol-detail { display: grid; grid-template-columns: minmax(380px, 600px) minmax(320px, 1fr); gap: 18px; align-items: start; }
+.ol-detail { display: grid; grid-template-columns: minmax(340px, 540px) minmax(320px, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .ol-detail { grid-template-columns: 1fr; } }
+/* left column: board card only — let it shrink naturally to board height */
 .ol-left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .ol-board-card { padding: 14px; }
 .ol-now { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 10px; font-size: 14px; }
@@ -96,13 +97,36 @@
 .ol-link:hover { color: #d2f29a; text-decoration: underline; }
 .ol-notice { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--lime); margin-top: 10px; }
 
-/* variation tree */
-.ol-right { padding: 14px 12px; position: sticky; top: 12px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; min-width: 0; }
-.ol-right-head { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px; margin-bottom: 10px; }
+/* variation tree + study/practice sidebar */
+.ol-right {
+  padding: 14px 12px;
+  position: sticky;
+  top: 12px;
+  /* fill the viewport height so board and sidebar align */
+  height: calc(100vh - 110px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.ol-right-head { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px; margin-bottom: 10px; flex-shrink: 0; }
 .ol-right-head h2 { font: 600 16px var(--display); margin-top: 4px; }
 .ol-right-tools { display: flex; gap: 12px; }
-.ol-tree-search { height: 34px; padding: 0 10px; margin-bottom: 8px; background: var(--sunken, #101b22); border: 1px solid var(--border, #2a3a43); border-radius: 6px; color: var(--text); font-size: 13px; outline: 0; }
-.ol-tree { overflow: auto; flex: 1; min-height: 120px; }
+.ol-tree-search { height: 34px; padding: 0 10px; margin-bottom: 8px; background: var(--sunken, #101b22); border: 1px solid var(--border, #2a3a43); border-radius: 6px; color: var(--text); font-size: 13px; outline: 0; flex-shrink: 0; }
+/* scrollable tree area: takes remaining space between header and bottom panel */
+.ol-tree-scroll { overflow-y: auto; flex: 1 1 0; min-height: 60px; }
+/* bottom panel: study/practice tabs + repertoire; never scrolls itself */
+.ol-right-bottom {
+  flex-shrink: 0;
+  border-top: 1px solid #263740;
+  padding-top: 10px;
+  margin-top: 10px;
+  overflow-y: auto;
+  max-height: 46%;
+}
+.ol-right-repertoire { margin-top: 10px; padding-top: 10px; border-top: 1px solid #263740; }
+/* keep the old .ol-tree rule for VariationTree's internal class */
+.ol-tree { overflow: visible; }
 .ol-tree-row { display: flex; align-items: center; gap: 4px; min-height: 32px; border-radius: 6px; padding-right: 8px; }
 .ol-tree-row:hover { background: #1f313a; }
 .ol-tree-row.is-selected { background: #2a3f30; }

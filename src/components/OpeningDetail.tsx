@@ -86,7 +86,7 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
   const [practice, setPractice] = useState<PracticeState>(() => startPractice(startLine.moves ?? [], initialSide));
   const [hintPly, setHintPly] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
-  const [nonce, setNonce] = useState(0); // bump to force the board to redraw after a rejected move
+  const [nonce, setNonce] = useState(0);
   const timer = useRef<number | undefined>(undefined);
   const recorded = useRef(false);
 
@@ -272,10 +272,11 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
       </header>
 
       <div className="ol-detail">
+        {/* ── Left: board only ── */}
         <section className="ol-left">
           {isOpponentBlunder && (
-            <div style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "6px", marginBottom: "4px", fontSize: "12px", color: "#fca5a5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-              <span>⚠️ <strong>Blunder Demonstration:</strong> You are currently playing {userSide === "white" ? "White" : "Black"} (the side that falls for the trap and gets checkmated or loses material).</span>
+            <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "6px", marginBottom: "4px", fontSize: "12px", color: "#fca5a5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+              <span>⚠️ <strong>Blunder Demonstration:</strong> You are playing {userSide === "white" ? "White" : "Black"} — the side that falls for the trap.</span>
               <button className="ol-link" style={{ color: "#fef08a", textDecoration: "underline" }} onClick={() => chooseSide(recommendedSide)}>
                 Switch to {recommendedSide === "white" ? "White" : "Black"} (Winning side)
               </button>
@@ -336,28 +337,66 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
               <button className="icon-btn" onClick={() => setFlipped(f => !f)} aria-label="Flip board" title="Flip board"><ArrowUpDown size={15} /></button>
             </div>
           </div>
+        </section>
 
-          {(line.trapMotif || line.trapDescription) && (
-            <div className="panel ol-card-pad ol-trap-card">
-              <div className="ol-trap-card-head" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <span className="ol-trap-tag">⚡ TACTICAL MOTIF</span>
-                <strong style={{ fontSize: "14px", color: "var(--text)" }}>{line.trapMotif}</strong>
-              </div>
-              {line.trapDescription && (
-                <p className="ol-trap-card-desc" style={{ fontSize: "13px", color: "var(--soft)", margin: "8px 0 0", lineHeight: 1.5 }}>
-                  {line.trapDescription}
-                </p>
-              )}
+        {/* ── Right: variations tree + study/practice ── */}
+        <aside className="panel ol-right">
+
+          {/* Tree section — scrollable */}
+          <div className="ol-right-head">
+            <div>
+              <div className="ol-label">VARIATIONS</div>
+              <h2>{family.lineCount} lines</h2>
             </div>
-          )}
+            <div className="ol-right-tools">
+              <button className="ol-link" onClick={() => setExpanded(new Set(expandableIds(family.root)))}>Expand all</button>
+              <button className="ol-link" onClick={() => setExpanded(new Set([family.root.id]))}>Collapse</button>
+            </div>
+          </div>
+          <input
+            className="ol-tree-search"
+            value={treeQuery}
+            onChange={e => setTreeQuery(e.target.value)}
+            placeholder={`Search within ${family.name}`}
+            aria-label="Search variations"
+          />
+          <div className="ol-tree-scroll">
+            {visibleRoot ? (
+              <VariationTree
+                root={visibleRoot}
+                expanded={effectiveExpanded}
+                selectedId={idPath(line.name)}
+                progress={progress}
+                onToggle={toggle}
+                onSelect={(node: VariationNode) => node.line && chooseLine(node.line)}
+              />
+            ) : (
+              <p className="ol-hint">No variation matches "{treeQuery}".</p>
+            )}
+          </div>
 
-          <div className="panel ol-card-pad">
+          {/* Study / Practice section — fixed below the tree */}
+          <div className="ol-right-bottom">
+            {(line.trapMotif || line.trapDescription) && (
+              <div style={{ padding: "9px 12px", borderLeft: "3px solid #eab308", background: "#1c1d19", borderRadius: "4px", marginBottom: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span className="ol-trap-tag">⚡ TACTICAL MOTIF</span>
+                  <strong style={{ fontSize: "13px", color: "var(--text)" }}>{line.trapMotif}</strong>
+                </div>
+                {line.trapDescription && (
+                  <p style={{ fontSize: "12px", color: "var(--soft)", margin: "5px 0 0", lineHeight: 1.5 }}>
+                    {line.trapDescription}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="ol-tabs" role="tablist">
               <button role="tab" aria-selected={mode === "study"} className={mode === "study" ? "on" : ""} onClick={() => chooseMode("study")}>Study</button>
               <button role="tab" aria-selected={mode === "practise"} className={mode === "practise" ? "on" : ""} onClick={() => chooseMode("practise")}>Practise</button>
               <span className="ol-spacer" />
               <span className={`ol-status ol-status-${status}`}>
-                {status === "mastered" ? "Mastered" : status === "learning" ? `Learning · ${streak}/${MASTER_STREAK} clean runs` : "Not practised yet"}
+                {status === "mastered" ? "Mastered ✓" : status === "learning" ? `${streak}/${MASTER_STREAK}` : "New"}
               </span>
             </div>
 
@@ -391,19 +430,17 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
               </div>
             ) : !canPractise ? (
               <p className="ol-hint">
-                This line has no moves for {userSide === "white" ? "White" : "Black"} to play. Switch sides above, or pick a longer line.
+                No moves for {userSide === "white" ? "White" : "Black"} in this line. Switch sides or pick a longer variation.
               </p>
             ) : practice.finished ? (
               <div className={`ol-result ${isOpponentBlunder ? "messy" : isClean(practice) ? "clean" : "messy"}`} role="status">
                 {isOpponentBlunder ? (
                   <>
                     <strong style={{ color: "#f87171" }}>Blunder demonstration finished</strong>
-                    <span>
-                      You stepped through the moves of the falling player ({userSide === "white" ? "White" : "Black"}). In competitive games, do not play these moves! Switch to {recommendedSide === "white" ? "White" : "Black"} to practice executing the trap or refutation.
-                    </span>
+                    <span>Switch to {recommendedSide === "white" ? "White" : "Black"} to practise the winning side.</span>
                     <div className="ol-result-actions" style={{ marginTop: "8px" }}>
                       <button className="button button-primary button-small" onClick={() => chooseSide(recommendedSide)}>
-                        ⚡ Practice as {recommendedSide === "white" ? "White" : "Black"} (Winning line)
+                        ⚡ Play as {recommendedSide === "white" ? "White" : "Black"} (Winning line)
                       </button>
                     </div>
                   </>
@@ -421,7 +458,7 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
                       <button className="button button-primary button-small" onClick={() => resetPractice(line, userSide)}>Practise again</button>
                       {nextToLearn && (
                         <button className="button button-secondary button-small" onClick={() => { chooseLine(nextToLearn); setExpanded(prev => new Set([...prev, ...ancestorIds(nextToLearn.name)])); }}>
-                          Next line: {nextToLearn.name.split(":").slice(-1)[0].trim()}
+                          Next: {nextToLearn.name.split(":").slice(-1)[0].trim()}
                         </button>
                       )}
                     </div>
@@ -436,59 +473,30 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
                 <span className="ol-counts">Mistakes {practice.mistakes} · Hints {practice.hints}</span>
               </div>
             )}
-          </div>
 
-          <div className="panel ol-card-pad ol-repertoire">
-            <div className="ol-label">MY REPERTOIRE</div>
-            {status === "mastered" ? (
-              <button className="button button-primary" onClick={addToRepertoire}>Add this line to my {userSide} repertoire</button>
-            ) : (
-              <>
-                <p className="ol-hint">
-                  Repertoires are for lines you already know. Master this one first ({streak}/{MASTER_STREAK} clean runs).
+            {/* Repertoire gate */}
+            <div className="ol-right-repertoire">
+              <div className="ol-label">MY REPERTOIRE</div>
+              {status === "mastered" ? (
+                <button className="button button-primary button-small" style={{ width: "100%", marginTop: "6px" }} onClick={addToRepertoire}>
+                  Add this line to my {userSide} repertoire
+                </button>
+              ) : (
+                <>
+                  <p className="ol-hint" style={{ marginTop: "6px", marginBottom: "4px" }}>
+                    Master this line first ({streak}/{MASTER_STREAK} clean runs).
+                  </p>
+                  <button className="ol-link" onClick={addToRepertoire}>Add it anyway</button>
+                </>
+              )}
+              {notice && (
+                <p className="ol-notice" role="status" style={{ marginTop: "6px" }}>
+                  <Check size={13} /> {notice}{" "}
+                  <button className="ol-link" onClick={onViewRepertoire}>Open my repertoire</button>
                 </p>
-                <button className="ol-link" onClick={addToRepertoire}>Add it anyway</button>
-              </>
-            )}
-            {notice && (
-              <p className="ol-notice" role="status">
-                <Check size={13} /> {notice}{" "}
-                <button className="ol-link" onClick={onViewRepertoire}>Open my repertoire</button>
-              </p>
-            )}
-          </div>
-        </section>
-
-        <aside className="panel ol-right">
-          <div className="ol-right-head">
-            <div>
-              <div className="ol-label">VARIATIONS</div>
-              <h2>{family.lineCount} lines</h2>
-            </div>
-            <div className="ol-right-tools">
-              <button className="ol-link" onClick={() => setExpanded(new Set(expandableIds(family.root)))}>Expand all</button>
-              <button className="ol-link" onClick={() => setExpanded(new Set([family.root.id]))}>Collapse</button>
+              )}
             </div>
           </div>
-          <input
-            className="ol-tree-search"
-            value={treeQuery}
-            onChange={e => setTreeQuery(e.target.value)}
-            placeholder={`Search within ${family.name}`}
-            aria-label="Search variations"
-          />
-          {visibleRoot ? (
-            <VariationTree
-              root={visibleRoot}
-              expanded={effectiveExpanded}
-              selectedId={idPath(line.name)}
-              progress={progress}
-              onToggle={toggle}
-              onSelect={(node: VariationNode) => node.line && chooseLine(node.line)}
-            />
-          ) : (
-            <p className="ol-hint">No variation matches “{treeQuery}”.</p>
-          )}
         </aside>
       </div>
     </div>
