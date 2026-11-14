@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Curated Opening Traps Catalog & Deep Variations (`src/data/openings/traps.ts`)**: Integrated 50 tactical chess opening traps (e.g. Légal's Mate, Noah's Ark, Siberian Trap, Elephant Trap, Lasker Trap, Cambridge Springs, Halosar, Blackburne Shilling, etc.) featuring full-length move sequences (up to 26 plies), tactical motif cards, explanatory descriptions, `⚡ Trap` tree badges, card trap counters, and a dedicated `⚡ Traps` library filter.
+- **Intelligent Opening Recommendations & Missed Theory Detection (`src/lib/openings/opening-recommendations.ts`)**:
+  - `findMissedTheoryLines()`: Scans player library games to pinpoint positions where the player (not the opponent) deviated from master theory, recording the played move, frequency, W/D/L record, and common book continuations missed (with variation names and line counts).
+  - `generateOpeningRecommendations()`: Computes tailored recommendations categorized into:
+    - ⚠️ **Repair Needed**: Openings where player scores `< 45%` or exits theory before move 3.
+    - ⚡ **Theory Gap**: Positions where player repeatedly misses popular mainlines.
+    - 🏆 **Personal Weapon**: High-performing openings (`≥ 60%` score) to deepen with 8–13 move variations.
+    - 🛡️ **Foundational Starters**: Principled starter recommendations for beginners or empty libraries.
+  - **Analytics UI Integration (`AnalyticsView.tsx`)**: Replaced raw stats with a 3-tab **Opening Intelligence & Experience Recommender** (`💡 Recommendations`, `⚠️ Missed Theory`, `📊 Opening Record`), with direct **"Study in Learn Openings →"** navigation buttons.
+- **Deep Master-Level Theory Mainlines (`src/data/openings/theory-lines.ts`)**:
+  - 45 master-level theoretical mainlines reaching 8–13 moves (16–26 plies) for all major openings (Italian Giuoco Piano, Evans Gambit, Closed Ruy Lopez, Najdorf English Attack, Dragon Yugoslav, French Winawer, Caro-Kann Classical, QGD Tartakower, Slav, King's Indian Mar del Plata, etc.).
+- **Side-by-Side Learn Layout Refactor (`OpeningDetail.tsx`, `styles-openings.css`)**:
+  - Moved Study/Practice tabs, tactical motif cards, and Repertoire promotion gate into the sticky right sidebar beneath the variation tree. Board card on the left stands alone with nothing below the board.
+- **Winning Side Classification & Auto-Assignment**:
+  - `intendedSideOfLine()`: Auto-detects the winning trapper or defending refuter for every line.
+  - Automatically flips the board and selects the intended side upon opening a line so users never practice blundering into checkmate.
+- **Curated Opening Traps Catalog & Deep Variations (`src/data/openings/traps.ts`)**: Integrated 60 tactical chess opening traps and trap refutations (e.g. Légal's Mate, Noah's Ark, Siberian Trap, Elephant Trap, Lasker Trap, Cambridge Springs, Halosar, Blackburne Shilling, etc.) featuring full-length move sequences (up to 26 plies), tactical motif cards, explanatory descriptions, `⚡ Trap` tree badges, card trap counters, and a dedicated `⚡ Traps` library filter.
 - **Learn Openings & Opening Library (Learn First, Repertoire Second)**: Introduced dedicated `OpeningsHub` separating opening study into **Learn Openings** (default) and **My Repertoire**:
   - **Opening Library Browser (`OpeningLibrary.tsx`)**: 149 opening families with variation trees, cards with White/Black indicators, ECO ranges, line counts, search, and progress tracking.
   - **Interactive Opening Study & Practise (`OpeningDetail.tsx`)**: Study mode with forward/back navigation, theory continuations, and move replacement; Practise mode with memory testing, automatic opponent responses, hint arrows, mistake tracking, and mastery progression (3 consecutive clean runs).
