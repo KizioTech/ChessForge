@@ -1,12 +1,12 @@
 /**
- * traps.ts: Curated catalog of 50 famous, tactical, and instructive chess opening traps.
+ * traps.ts: Curated catalog of 60 famous opening traps and their critical refutations.
  *
  * Each trap features:
  *  - Full move sequence up to the tactical climax/refutation (6 to 26 plies).
  *  - ECO code and standardized family naming for seamless integration into Learn trees.
  *  - Tactical motif (smothered mate, deflection, queen trap, underpromotion, pin).
- *  - Detailed explanation of why the trap works and how it is executed.
- *  - Owning side (who springs the trap).
+ *  - Detailed explanation of why the trap works and how it is executed or refuted.
+ *  - Owning side: The side who WINS / BENEFITS from this line (the trapper, or the defender in refutations).
  */
 
 export interface OpeningTrap {
@@ -16,6 +16,7 @@ export interface OpeningTrap {
   side: "white" | "black";
   motif: string;
   description: string;
+  isRefutation?: boolean;
 }
 
 export const KNOWN_TRAPS: OpeningTrap[] = [
@@ -30,11 +31,29 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
   },
   {
     eco: "C50",
+    name: "Italian Game: Légal Trap Refutation",
+    pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. Nc3 Bg4 5. h3 Bh5 6. Nxe5 Nxe5 7. Qxh5 Nxc4 8. Qb5+ c6 9. Qxc4 Nf6",
+    side: "black",
+    motif: "Piece capture / Avoids mate",
+    description: "Black does not blindly take the queen on d1! Playing 6...Nxe5! captures White's attacking knight, parrying the mate and leaving Black with an extra minor piece.",
+    isRefutation: true
+  },
+  {
+    eco: "C50",
     name: "Italian Game: Blackburne Shilling Gambit Trap",
     pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nd4 4. Nxe5 Qg5 5. Nxf7 Qxg2 6. Rf1 Qxe4+ 7. Be2 Nf3#",
     side: "black",
     motif: "Smothered mate / Queen fork",
     description: "Black baits White into grabbing on e5 and f7, then terrorizes the kingside and delivers smothered mate with 7...Nf3#."
+  },
+  {
+    eco: "C50",
+    name: "Italian Game: Blackburne Shilling Refutation",
+    pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nd4 4. Nxd4 exd4 5. O-O d6 6. d3 Nf6 7. f4 Be7 8. Nd2 O-O",
+    side: "white",
+    motif: "Central trade / White advantage",
+    description: "White refuses to take the bait on e5. Trading knights on d4 leaves Black with doubled d-pawns and hands White a large developmental advantage.",
+    isRefutation: true
   },
   {
     eco: "C57",
@@ -79,6 +98,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     description: "Black traps White's prized light-squared bishop on b3 using the queenside pawn chain a6, b5, and c4."
   },
   {
+    eco: "C71",
+    name: "Ruy Lopez: Noah's Ark Trap Avoidance",
+    pgn: "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. d4 b5 6. Bb3 Nxd4 7. Nxd4 exd4 8. c3 dxc3 9. Qd5 Be6 10. Qc6+ Bd7 11. Qxc3 Nf6",
+    side: "white",
+    motif: "Pawn sacrifice / White dominates",
+    description: "White avoids 8.Qxd4? which leads to the bishop trap. Playing 8.c3! vacates c2 for the bishop or queen, keeping a great attacking position.",
+    isRefutation: true
+  },
+  {
     eco: "C65",
     name: "Ruy Lopez: Berlin Defense, Mortimer Trap",
     pgn: "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Ne7 5. Nxe5 c6 6. Nc4 Ng6 7. Ba4 b5",
@@ -111,6 +139,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     side: "black",
     motif: "Deflection / Mate on h2",
     description: "When White plays 9.h3?, Black stuns White with 9...Nd4!, removing the defender of h2 and threatening the white queen."
+  },
+  {
+    eco: "B21",
+    name: "Sicilian Defense: Smith-Morra Siberian Trap Avoidance",
+    pgn: "1. e4 c5 2. d4 cxd4 3. c3 dxc3 4. Nxc3 Nc6 5. Nf3 e6 6. Bc4 Qc7 7. O-O Nf6 8. Qe2 Ng4 9. Rd1 a6 10. h3 Nge5 11. Nxe5 Nxe5 12. Bb3",
+    side: "white",
+    motif: "Prophylaxis / Rapid development",
+    description: "White avoids 9.h3? Nd4! by playing 9.Rd1! first. Black's tactical trick is completely neutralized and White retains an active initiative.",
+    isRefutation: true
   },
   {
     eco: "B57",
@@ -155,6 +192,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     description: "White falls for the phantom pin on the f6 knight. After 6...Nxd5! 7.Bxd8 Bb4+!, Black wins a clean piece."
   },
   {
+    eco: "D51",
+    name: "Queen's Gambit Declined: Elephant Trap Avoidance",
+    pgn: "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Nbd7 5. e3 c6 6. Nf3 Be7 7. Qc2 O-O 8. Rd1 a6",
+    side: "white",
+    motif: "Solid development / Refuses poisoned pawn",
+    description: "White recognizes that the d5 pawn is protected tactically by 6...Nxd5! and simply develops with 5.e3 and 6.Nf3 with a solid, enduring advantage.",
+    isRefutation: true
+  },
+  {
     eco: "D52",
     name: "Queen's Gambit Declined: Cambridge Springs Trap",
     pgn: "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Nbd7 5. e3 c6 6. Nf3 Qa5 7. Nd2 Bb4 8. Qc2 O-O 9. Bd3 dxc4 10. Bxf6 cxd3 11. Qxd3 Nxf6",
@@ -179,6 +225,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     description: "The most famous underpromotion in chess: Black promotes to a knight on g1 with check, winning White's queen."
   },
   {
+    eco: "D08",
+    name: "Queen's Gambit Declined: Albin Countergambit, Lasker Trap Avoidance",
+    pgn: "1. d4 d5 2. c4 e5 3. dxe5 d4 4. Nf3 Nc6 5. a3 Bg4 6. Nbd2 Qe7 7. h3 Bxf3 8. Nxf3 O-O-O",
+    side: "white",
+    motif: "Restricting Bb4+ / Holding e5",
+    description: "White avoids the suicidal 4.e3? Bb4+! by playing 4.Nf3! and 5.a3, preventing Black's dark-squared bishop from causing havoc.",
+    isRefutation: true
+  },
+  {
     eco: "D20",
     name: "Queen's Gambit Accepted: Trap with 3...b5",
     pgn: "1. d4 d5 2. c4 dxc4 3. e3 b5 4. a4 c6 5. axb5 cxb5 6. Qf3",
@@ -193,6 +248,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     side: "black",
     motif: "Smothered mate / Absolute pin",
     description: "White plays 8.axb4?? expecting an easy piece, but Black responds with the devastating 8...Nd3# smothered mate."
+  },
+  {
+    eco: "A52",
+    name: "Budapest Gambit: Kieninger Trap Avoidance",
+    pgn: "1. d4 Nf6 2. c4 e5 3. dxe5 Ng4 4. Bf4 Nc6 5. Nf3 Bb4+ 6. Nbd2 Qe7 7. e3 Ngxe5 8. Be2 Nxf3+ 9. Bxf3 d6 10. O-O",
+    side: "white",
+    motif: "Development / Extra pawn",
+    description: "White does not fall for 8.axb4?? Nd3#. Playing 7.e3 and 8.Be2 cleanly untangles the pinned knight and consolidates White's extra pawn.",
+    isRefutation: true
   },
   {
     eco: "A51",
@@ -271,6 +335,15 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
     description: "White sacrifices the d4 and e5 pawns for massive development and control over the central e-file."
   },
   {
+    eco: "C02",
+    name: "French Defense: Advance Variation, Milner-Barry Refutation",
+    pgn: "1. e4 e6 2. d4 d5 3. e5 c5 4. c3 Nc6 5. Nf3 Qb6 6. Bd3 cxd4 7. cxd4 Bd7 8. O-O Nxd4 9. Nxd4 Qxd4 10. Nc3 a6 11. Qe2 Ne7 12. Kh1 Nc6 13. f4 Nb4",
+    side: "black",
+    motif: "Consolidating gambit pawn / Bishop challenge",
+    description: "Black plays 10...a6! preventing Nb5 and challenges White's d3 bishop with 13...Nb4!, repelling White's attack and converting the extra pawn.",
+    isRefutation: true
+  },
+  {
     eco: "C10",
     name: "French Defense: Rubinstein Variation Trap",
     pgn: "1. e4 e6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Nd7 5. Nf3 Ngf6 6. Bd3 Be7 7. Qe2 O-O 8. Bg5 Nxe4 9. Qxe4 g6 10. Qh4",
@@ -316,11 +389,29 @@ export const KNOWN_TRAPS: OpeningTrap[] = [
   },
   {
     eco: "A40",
+    name: "Englund Gambit: Soller Trap Avoidance",
+    pgn: "1. d4 e5 2. dxe5 f6 3. exf6 Nxf6 4. Nf3 Bc5 5. e3 O-O 6. Be2 d5 7. O-O c6 8. c4",
+    side: "white",
+    motif: "Consolidation / Extra pawn",
+    description: "White avoids 5.Bg5? Ne4! by calmly solidifying with 5.e3! and 6.Be2, leaving Black down a pawn with zero compensation.",
+    isRefutation: true
+  },
+  {
+    eco: "A40",
     name: "Englund Gambit: Queen Trap & Mate",
     pgn: "1. d4 e5 2. dxe5 Nc6 3. Nf3 Qe7 4. Bf4 Qb4+ 5. Bd2 Qxb2 6. Bc3 Bb4 7. Qd2 Bxc3 8. Qxc3 Qc1#",
     side: "black",
     motif: "Pin / Back-rank mate",
     description: "White plays 6.Bc3 to defend a1, but Black pins the bishop with 6...Bb4! and forces checkmate on c1."
+  },
+  {
+    eco: "A40",
+    name: "Englund Gambit: Tri-Fork Trap Avoidance",
+    pgn: "1. d4 e5 2. dxe5 Nc6 3. Nf3 Qe7 4. Qd5 f6 5. exf6 Nxf6 6. Qb3 d5 7. c3",
+    side: "white",
+    motif: "Queen defense / Black has no attack",
+    description: "White avoids the messy 4.Bf4 Qb4+ line by holding the e5 pawn with 4.Qd5! and anchoring the queenside.",
+    isRefutation: true
   },
 
   // ── Dutch Defense ───────────────────────────────────────────────────────────

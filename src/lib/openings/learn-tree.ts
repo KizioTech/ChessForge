@@ -52,6 +52,23 @@ export function lineKey(line: { eco: string; name: string }): string {
 }
 
 /**
+ * Determines which side a specific line is intended to train / who it helps.
+ * For traps and refutations, this is strictly the winning side (the trapper, or the defender in refutations).
+ * For generic openings, it falls back to the line keywords or the family's side.
+ */
+export function intendedSideOfLine(line: BookOpening, familySide: OpeningSide): OpeningSide {
+  if (line.side) return line.side;
+  const lower = line.name.toLowerCase();
+  if (lower.includes("defense") || lower.includes("countergambit") || lower.includes("counter-attack")) {
+    return "black";
+  }
+  if (lower.includes("attack") || lower.includes("gambit accepted")) {
+    return "white";
+  }
+  return familySide;
+}
+
+/**
  * Who "owns" an opening. A family called a Defense belongs to Black. Otherwise whoever plays the
  * last move of the shortest line names it: 1.e4 c5 (Sicilian) ends on Black's move, while
  * 1.e4 e5 2.Nf3 Nc6 3.Bc4 (Italian Game) ends on White's.

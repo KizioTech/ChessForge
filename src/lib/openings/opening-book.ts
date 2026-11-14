@@ -13,9 +13,11 @@ export interface BookOpening {
   pgn: string;
   /** SAN moves of the line, filled in by buildOpeningBook. */
   moves?: string[];
+  side?: "white" | "black";
   isTrap?: boolean;
   trapMotif?: string;
   trapDescription?: string;
+  isRefutation?: boolean;
 }
 
 export interface OpeningBook {
@@ -96,9 +98,11 @@ export function loadOpeningBook(): Promise<OpeningBook> {
         eco: t.eco,
         name: t.name,
         pgn: t.pgn,
+        side: t.side,
         isTrap: true,
         trapMotif: t.motif,
-        trapDescription: t.description
+        trapDescription: t.description,
+        isRefutation: t.isRefutation
       }));
       return buildOpeningBook([...tsvOpenings, ...trapOpenings]);
     });

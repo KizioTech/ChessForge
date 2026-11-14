@@ -7,7 +7,7 @@ import { BoardView } from "./BoardView";
 import { VariationTree } from "./VariationTree";
 import { identifyOpening, nextBookMoves, type BookOpening, type OpeningBook } from "../lib/openings/opening-book";
 import {
-  expandableIds, filterTree, leafLines, lineKey, splitName, type OpeningFamily, type OpeningSide, type VariationNode
+  expandableIds, filterTree, intendedSideOfLine, leafLines, lineKey, splitName, type OpeningFamily, type OpeningSide, type VariationNode
 } from "../lib/openings/learn-tree";
 import {
   advanceOpponent, attempt, expectedSan, isClean, isUserTurn, sameSan, startPractice, withHint, userMoveCount,
@@ -71,9 +71,10 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
     [lines, family, initialLineKey]
   );
 
+  const initialSide = useMemo(() => intendedSideOfLine(startLine, family.side), [startLine, family]);
   const [line, setLine] = useState<BookOpening>(startLine);
   const [mode, setMode] = useState<"study" | "practise">("study");
-  const [userSide, setUserSide] = useState<OpeningSide>(family.side);
+  const [userSide, setUserSide] = useState<OpeningSide>(initialSide);
   const [flipped, setFlipped] = useState(false);
 
   // study state
@@ -82,7 +83,7 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
 
   // practise state
   const lineMoves = line.moves ?? [];
-  const [practice, setPractice] = useState<PracticeState>(() => startPractice(startLine.moves ?? [], family.side));
+  const [practice, setPractice] = useState<PracticeState>(() => startPractice(startLine.moves ?? [], initialSide));
   const [hintPly, setHintPly] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const [nonce, setNonce] = useState(0); // bump to force the board to redraw after a rejected move
@@ -107,11 +108,14 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
 
   function chooseLine(l: BookOpening) {
     const m = l.moves ?? [];
+    const targetSide = intendedSideOfLine(l, family.side);
     setLine(l);
     setMoves(m);
     setCursor(m.length);
     setNotice(null);
-    resetPractice(l, userSide);
+    setUserSide(targetSide);
+    setFlipped(false);
+    resetPractice(l, targetSide);
   }
 
   function chooseSide(side: OpeningSide) {
@@ -173,13 +177,18 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
     setHintPly(practice.ply);
   }
 
+  const recommendedSide = intendedSideOfLine(line, family.side);
+  const isOpponentBlunder = Boolean(line.isTrap || line.name.toLowerCase().includes("trap")) && userSide !== recommendedSide;
+
   // Record a finished run exactly once.
   useEffect(() => {
     if (mode === "practise" && canPractise && practice.finished && !recorded.current) {
       recorded.current = true;
-      onRecord(line, isClean(practice));
+      if (!isOpponentBlunder) {
+        onRecord(line, isClean(practice));
+      }
     }
-  }, [mode, canPractise, practice, line, onRecord]);
+  }, [mode, canPractise, practice, line, onRecord, isOpponentBlunder]);
 
   // Arrow keys step through the line while studying.
   useEffect(() => {
@@ -251,13 +260,27 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
           {(["white", "black"] as const).map(s => (
             <button key={s} className={`ol-chip${userSide === s ? " on" : ""}`} onClick={() => chooseSide(s)}>
               {s === "white" ? "White" : "Black"}
+              {(line.isTrap || line.name.toLowerCase().includes("trap")) && s === recommendedSide ? " ★" : ""}
             </button>
           ))}
+          {(line.isTrap || line.name.toLowerCase().includes("trap")) && (
+            <span style={{ fontSize: "11px", color: "var(--muted)", marginLeft: "4px" }}>
+              ({recommendedSide === "white" ? "White" : "Black"} wins)
+            </span>
+          )}
         </div>
       </header>
 
       <div className="ol-detail">
         <section className="ol-left">
+          {isOpponentBlunder && (
+            <div style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "6px", marginBottom: "4px", fontSize: "12px", color: "#fca5a5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+              <span>⚠️ <strong>Blunder Demonstration:</strong> You are currently playing {userSide === "white" ? "White" : "Black"} (the side that falls for the trap and gets checkmated or loses material).</span>
+              <button className="ol-link" style={{ color: "#fef08a", textDecoration: "underline" }} onClick={() => chooseSide(recommendedSide)}>
+                Switch to {recommendedSide === "white" ? "White" : "Black"} (Winning side)
+              </button>
+            </div>
+          )}
           <div className="panel ol-board-card">
             <div className="ol-now">
               {mode === "study" ? (
@@ -371,23 +394,39 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
                 This line has no moves for {userSide === "white" ? "White" : "Black"} to play. Switch sides above, or pick a longer line.
               </p>
             ) : practice.finished ? (
-              <div className={`ol-result ${isClean(practice) ? "clean" : "messy"}`} role="status">
-                <strong>{isClean(practice) ? "Clean run!" : "Finished, but not clean."}</strong>
-                <span>
-                  {isClean(practice)
-                    ? status === "mastered"
-                      ? "You have mastered this line."
-                      : `${streak} of ${MASTER_STREAK} clean runs in a row.`
-                    : `${practice.mistakes} mistake${practice.mistakes === 1 ? "" : "s"}, ${practice.hints} hint${practice.hints === 1 ? "" : "s"}. A clean run needs neither.`}
-                </span>
-                <div className="ol-result-actions">
-                  <button className="button button-primary button-small" onClick={() => resetPractice(line, userSide)}>Practise again</button>
-                  {nextToLearn && (
-                    <button className="button button-secondary button-small" onClick={() => { chooseLine(nextToLearn); setExpanded(prev => new Set([...prev, ...ancestorIds(nextToLearn.name)])); }}>
-                      Next line: {nextToLearn.name.split(":").slice(-1)[0].trim()}
-                    </button>
-                  )}
-                </div>
+              <div className={`ol-result ${isOpponentBlunder ? "messy" : isClean(practice) ? "clean" : "messy"}`} role="status">
+                {isOpponentBlunder ? (
+                  <>
+                    <strong style={{ color: "#f87171" }}>Blunder demonstration finished</strong>
+                    <span>
+                      You stepped through the moves of the falling player ({userSide === "white" ? "White" : "Black"}). In competitive games, do not play these moves! Switch to {recommendedSide === "white" ? "White" : "Black"} to practice executing the trap or refutation.
+                    </span>
+                    <div className="ol-result-actions" style={{ marginTop: "8px" }}>
+                      <button className="button button-primary button-small" onClick={() => chooseSide(recommendedSide)}>
+                        ⚡ Practice as {recommendedSide === "white" ? "White" : "Black"} (Winning line)
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <strong>{isClean(practice) ? "Clean run!" : "Finished, but not clean."}</strong>
+                    <span>
+                      {isClean(practice)
+                        ? status === "mastered"
+                          ? "You have mastered this line."
+                          : `${streak} of ${MASTER_STREAK} clean runs in a row.`
+                        : `${practice.mistakes} mistake${practice.mistakes === 1 ? "" : "s"}, ${practice.hints} hint${practice.hints === 1 ? "" : "s"}. A clean run needs neither.`}
+                    </span>
+                    <div className="ol-result-actions">
+                      <button className="button button-primary button-small" onClick={() => resetPractice(line, userSide)}>Practise again</button>
+                      {nextToLearn && (
+                        <button className="button button-secondary button-small" onClick={() => { chooseLine(nextToLearn); setExpanded(prev => new Set([...prev, ...ancestorIds(nextToLearn.name)])); }}>
+                          Next line: {nextToLearn.name.split(":").slice(-1)[0].trim()}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="ol-practice" role="status" aria-live="polite">

@@ -43,8 +43,10 @@ export function VariationTree({ root, expanded, selectedId, progress, onToggle, 
             >
               <span className="ol-tree-text">{depth === 0 ? "Main line" : node.label}</span>
               {node.line && <span className="ol-eco">{node.line.eco}</span>}
-              {(node.line?.isTrap || node.label.toLowerCase().includes("trap")) && (
-                <span className="ol-tree-trap-badge" title="Tactical Trap">⚡ Trap</span>
+              {(node.line?.isTrap || node.label.toLowerCase().includes("trap") || node.line?.isRefutation) && (
+                <span className="ol-tree-trap-badge" title={`Tactical line for ${node.line?.side ?? "trapper"}`}>
+                  ⚡ {node.line?.isRefutation ? "Refutation" : "Trap"} ({node.line?.side === "black" ? "Black" : "White"})
+                </span>
               )}
             </button>
             {hasKids && <span className="ol-tree-count" title="Lines in this branch">{node.lineCount}</span>}
