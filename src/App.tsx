@@ -134,6 +134,7 @@ function App() {
   const [search, setSearch] = useState("");
   const [games, setGames] = useState<GameRecord[]>([]);
   const [activeGame, setActiveGame] = useState<GameRecord | null>(null);
+  const [openingsTargetFamily, setOpeningsTargetFamily] = useState<string | null>(null);
 
   // ── Phase 3: Engine analysis state ─────────────────────────────────────────
   const [analysisPositions, setAnalysisPositions] = useState<PositionRecord[]>([]);
@@ -586,6 +587,10 @@ function App() {
             games={games}
             onOpenAnalysis={openAnalysisForGame}
             onNavigateToTrain={() => setPage("Train")}
+            onNavigateToOpenings={(family) => {
+              setOpeningsTargetFamily(family || null);
+              setPage("Openings");
+            }}
           />
         )}
         {page === "Openings" && (
@@ -593,6 +598,7 @@ function App() {
             userId={user?.id}
             games={games}
             onOpenAnalysis={openAnalysisForGame}
+            initialFamily={openingsTargetFamily}
           />
         )}
         {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && (

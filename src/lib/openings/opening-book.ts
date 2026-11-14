@@ -91,8 +91,9 @@ export function loadOpeningBook(): Promise<OpeningBook> {
       import("../../data/openings/c.tsv?raw"),
       import("../../data/openings/d.tsv?raw"),
       import("../../data/openings/e.tsv?raw"),
-      import("../../data/openings/traps")
-    ]).then(([a, b, c, d, e, trapsModule]) => {
+      import("../../data/openings/traps"),
+      import("../../data/openings/theory-lines")
+    ]).then(([a, b, c, d, e, trapsModule, theoryModule]) => {
       const tsvOpenings = [a, b, c, d, e].flatMap(f => parseTsv(f.default));
       const trapOpenings: BookOpening[] = trapsModule.KNOWN_TRAPS.map(t => ({
         eco: t.eco,
@@ -104,7 +105,13 @@ export function loadOpeningBook(): Promise<OpeningBook> {
         trapDescription: t.description,
         isRefutation: t.isRefutation
       }));
-      return buildOpeningBook([...tsvOpenings, ...trapOpenings]);
+      const theoryOpenings: BookOpening[] = theoryModule.DEEP_THEORY_LINES.map(l => ({
+        eco: l.eco,
+        name: l.name,
+        pgn: l.pgn,
+        side: l.side
+      }));
+      return buildOpeningBook([...tsvOpenings, ...trapOpenings, ...theoryOpenings]);
     });
   }
   return bookPromise;

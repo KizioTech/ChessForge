@@ -14,3 +14,4 @@ export * from "./learn-tree";
 export * from "./line-practice";
 export * from "./line-progress";
 export * from "./use-line-progress";
+export * from "./opening-recommendations";

@@ -34,7 +34,16 @@ import type { MistakeRecord } from "../lib/training/types";
 import type { GameRecord } from "../lib/games";
 import { BoardView } from "./BoardView";
 import { batchAnalyzeGames } from "../lib/engine/fast-batch-analyzer";
-import { useOpeningBook, openingStats, type OpeningStat } from "../lib/openings";
+import {
+  useOpeningBook,
+  openingStats,
+  findMissedTheoryLines,
+  generateOpeningRecommendations,
+  type OpeningStat,
+  type MissedLineStat,
+  type OpeningRecommendation,
+  type StatGame
+} from "../lib/openings";
 
 interface AnalyticsViewProps {
   userId?: string;
@@ -42,6 +51,7 @@ interface AnalyticsViewProps {
   games: GameRecord[];
   onOpenAnalysis: (game: GameRecord) => void;
   onNavigateToTrain: () => void;
+  onNavigateToOpenings?: (family?: string) => void;
 }
 
 const TAG_LABELS: Record<MistakeTag, { label: string; desc: string; color: string; advice: string }> = {
@@ -88,7 +98,8 @@ export function AnalyticsView({
   totalGamesCount,
   games,
   onOpenAnalysis,
-  onNavigateToTrain
+  onNavigateToTrain,
+  onNavigateToOpenings
 }: AnalyticsViewProps) {
   const initialCount = Math.max(totalGamesCount, games.length);
   const initialLocal = useMemo(() => computeWeaknessAnalysis(getLocalMistakes(), initialCount), [initialCount]);
@@ -101,6 +112,7 @@ export function AnalyticsView({
   );
   const [isBatchScanning, setIsBatchScanning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [openingTab, setOpeningTab] = useState<"recommendations" | "missed" | "results">("recommendations");
 
   const loadData = () => {
     const count = Math.max(totalGamesCount, games.length);
@@ -163,16 +175,29 @@ export function AnalyticsView({
     return new Chess(selectedMistake.fen);
   }, [selectedMistake]);
 
-  // ── Opening Statistics ───────────────────────────────────────────────────────
+  // ── Opening Statistics & Recommendations ─────────────────────────────────────
   const book = useOpeningBook();
+  const statGames = useMemo<StatGame[]>(() => {
+    return games.map(g => ({
+      pgn: g.pgn || "",
+      result: g.result,
+      user_colour: g.user_colour
+    }));
+  }, [games]);
+
   const openingStatsRows = useMemo<OpeningStat[]>(() => {
     if (!book || games.length === 0) return [];
-    return openingStats(
-      games.map(g => ({ pgn: g.pgn || "", result: g.result, user_colour: g.user_colour })),
-      book,
-      3 // minimum 3 games to show a row
-    );
-  }, [book, games]);
+    return openingStats(statGames, book, 1);
+  }, [book, statGames]);
+
+  const missedTheoryLines = useMemo<MissedLineStat[]>(() => {
+    if (!book || games.length === 0) return [];
+    return findMissedTheoryLines(statGames, book, 1);
+  }, [book, statGames]);
+
+  const openingRecommendations = useMemo<OpeningRecommendation[]>(() => {
+    return generateOpeningRecommendations(openingStatsRows, missedTheoryLines, games.length);
+  }, [openingStatsRows, missedTheoryLines, games.length]);
 
   if (loading || !report) {
     return (
@@ -595,92 +620,314 @@ export function AnalyticsView({
         </div>
       </div>
 
-      {/* ── Opening Statistics Table ─────────────────────────────────────────── */}
+      {/* ── Opening Intelligence, Recommendations & Missed Lines ──────────── */}
       <div style={{ background: "var(--panel)", borderRadius: "10px", border: "1px solid var(--line)", padding: "1.25rem", marginTop: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: "600", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <BookOpen size={18} style={{ color: "var(--lime)" }} />
-            Results by Opening
-          </h2>
-          <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            {book
-              ? openingStatsRows.length > 0
-                ? `${openingStatsRows.length} opening${openingStatsRows.length === 1 ? "" : "s"} with 3+ games`
-                : games.length === 0
-                  ? "No games to analyse"
-                  : "No openings with 3+ games yet"
-              : "Loading offline book…"}
-          </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <h2 style={{ fontSize: "1.05rem", fontWeight: "600", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <BookOpen size={18} style={{ color: "var(--lime)" }} />
+              Opening Intelligence & Experience Recommender
+            </h2>
+            <p style={{ margin: "2px 0 0", fontSize: "0.785rem", color: "var(--muted)" }}>
+              Data-driven opening recommendations and detected theory deviations from your game history.
+            </p>
+          </div>
+
+          {/* Sub-tab Switcher */}
+          <div style={{ display: "flex", gap: "6px", background: "var(--sunken, #101b22)", padding: "3px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+            <button
+              className={`button button-small ${openingTab === "recommendations" ? "button-primary" : "button-secondary"}`}
+              style={{ fontSize: "11px", padding: "4px 10px" }}
+              onClick={() => setOpeningTab("recommendations")}
+            >
+              💡 Recommendations ({openingRecommendations.length})
+            </button>
+            <button
+              className={`button button-small ${openingTab === "missed" ? "button-primary" : "button-secondary"}`}
+              style={{ fontSize: "11px", padding: "4px 10px" }}
+              onClick={() => setOpeningTab("missed")}
+            >
+              ⚠️ Missed Theory ({missedTheoryLines.length})
+            </button>
+            <button
+              className={`button button-small ${openingTab === "results" ? "button-primary" : "button-secondary"}`}
+              style={{ fontSize: "11px", padding: "4px 10px" }}
+              onClick={() => setOpeningTab("results")}
+            >
+              📊 Opening Record ({openingStatsRows.length})
+            </button>
+          </div>
         </div>
 
-        {openingStatsRows.length > 0 ? (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", fontSize: "11px" }}>
-                  <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600 }}>Opening</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Colour</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Games</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>W / D / L</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Score %</th>
-                  <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Avg. Left Theory</th>
-                </tr>
-              </thead>
-              <tbody>
-                {openingStatsRows.map((row, i) => {
-                  const score = ((row.wins + row.draws * 0.5) / row.games * 100).toFixed(0);
-                  const scoreNum = parseFloat(score);
-                  return (
-                    <tr
-                      key={`${row.colour}|${row.family}|${i}`}
-                      style={{ borderBottom: "1px solid var(--line)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}
-                    >
-                      <td style={{ padding: "8px 10px", fontWeight: 500, maxWidth: "280px" }}>
-                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {row.family}
+        {/* ── Tab 1: Recommendations ── */}
+        {openingTab === "recommendations" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
+            {openingRecommendations.length === 0 ? (
+              <div style={{ padding: "2rem", textAlign: "center", color: "var(--muted)", fontSize: "0.85rem", gridColumn: "1 / -1" }}>
+                Play or import games to receive custom opening recommendations.
+              </div>
+            ) : (
+              openingRecommendations.map(rec => {
+                const badgeColor =
+                  rec.type === "repair"
+                    ? "#ef4444"
+                    : rec.type === "deepen"
+                    ? "var(--lime)"
+                    : rec.type === "gap"
+                    ? "#a855f7"
+                    : "#eab308";
+                const badgeText =
+                  rec.type === "repair"
+                    ? "⚠️ REPAIR NEEDED"
+                    : rec.type === "deepen"
+                    ? "🏆 PERSONAL WEAPON"
+                    : rec.type === "gap"
+                    ? "⚡ MISSED THEORY"
+                    : "⚡ TRAP ALERT";
+
+                return (
+                  <div
+                    key={rec.id}
+                    style={{
+                      background: "var(--panel2)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "8px",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: "10px"
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            letterSpacing: "0.5px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: `${badgeColor}1a`,
+                            color: badgeColor,
+                            border: `1px solid ${badgeColor}40`
+                          }}
+                        >
+                          {badgeText}
                         </span>
-                      </td>
-                      <td style={{ textAlign: "center", padding: "8px" }}>
-                        <span style={{
-                          display: "inline-block", width: "14px", height: "14px", borderRadius: "3px",
-                          background: row.colour === "black" ? "#101820" : "#ffffff",
-                          border: "1px solid var(--line)", verticalAlign: "middle"
-                        }} title={`Played as ${row.colour}`} />
-                      </td>
-                      <td style={{ textAlign: "center", padding: "8px", fontWeight: 600 }}>{row.games}</td>
-                      <td style={{ textAlign: "center", padding: "8px" }}>
-                        <span style={{ color: "#4ade80" }}>{row.wins}</span>
-                        {" / "}
-                        <span style={{ color: "#fbbf24" }}>{row.draws}</span>
-                        {" / "}
-                        <span style={{ color: "#f87171" }}>{row.losses}</span>
-                      </td>
-                      <td style={{ textAlign: "center", padding: "8px" }}>
-                        <span style={{
-                          fontWeight: 700,
-                          color: scoreNum >= 55 ? "var(--lime)" : scoreNum <= 40 ? "#f87171" : "var(--muted)"
-                        }}>
-                          {score}%
+                        <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "capitalize" }}>
+                          As {rec.side} {rec.score !== undefined ? `· ${rec.score}% score` : ""}
                         </span>
-                      </td>
-                      <td style={{ textAlign: "center", padding: "8px", color: "var(--muted)" }}>
-                        {row.avgLeftBookPly !== null
-                          ? `Move ${Math.ceil(row.avgLeftBookPly / 2)}`
-                          : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      <strong style={{ fontSize: "0.95rem", color: "var(--text)", display: "block" }}>
+                        {rec.title}
+                      </strong>
+                      <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--muted)", lineHeight: 1.45 }}>
+                        {rec.reason}
+                      </p>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "8px", borderTop: "1px solid var(--line)" }}>
+                      {onNavigateToOpenings ? (
+                        <button
+                          className="button button-secondary button-small"
+                          style={{ fontSize: "11px" }}
+                          onClick={() => onNavigateToOpenings(rec.openingFamily)}
+                        >
+                          Study in Learn Openings →
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                          Line: {rec.suggestedLine || rec.openingFamily}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        ) : (
-          <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: "12px" }}>
-            {book && games.length > 0
-              ? "Play more games in the same openings (need 3+ per opening) to see your results here."
-              : book
-              ? "Import games to see your opening statistics."
-              : "Opening stats will appear once the book loads."}
+        )}
+
+        {/* ── Tab 2: Missed Common Theory Lines ── */}
+        {openingTab === "missed" && (
+          <div>
+            {missedTheoryLines.length === 0 ? (
+              <div style={{ padding: "2rem", textAlign: "center", color: "var(--muted)", fontSize: "0.85rem" }}>
+                {games.length === 0
+                  ? "Import games to identify which common theoretical lines were missed."
+                  : "Great book discipline! No major early departures from master theory detected in your played moves."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ fontSize: "0.785rem", color: "var(--muted)", marginBottom: "4px" }}>
+                  Positions where you were in book theory, but played an alternative or unbook move on your turn:
+                </div>
+                {missedTheoryLines.map((m, idx) => (
+                  <div
+                    key={`${m.userColour}-${m.openingFamily}-${m.ply}-${m.playedSan}-${idx}`}
+                    style={{
+                      background: "var(--panel2)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "14px",
+                      flexWrap: "wrap"
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "220px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            padding: "1px 5px",
+                            borderRadius: "3px",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "var(--muted)",
+                            fontFamily: "var(--mono)"
+                          }}
+                        >
+                          {m.eco}
+                        </span>
+                        <strong style={{ fontSize: "0.9rem" }}>{m.openingFamily}</strong>
+                        <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                          (Move {m.moveNumber} as {m.userColour})
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.785rem", color: "var(--muted)" }}>
+                        You played: <strong style={{ color: "#f87171" }}>{m.playedSan}</strong> in {m.frequency} game{m.frequency === 1 ? "" : "s"} ({m.wins}W / {m.draws}D / {m.losses}L)
+                      </div>
+                    </div>
+
+                    {/* Common mainline options missed */}
+                    <div style={{ flex: 1, minWidth: "240px" }}>
+                      <div style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Mainline Book Continuations Missed:
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {m.missedOptions.slice(0, 3).map(opt => (
+                          <span
+                            key={opt.san}
+                            style={{
+                              fontSize: "11px",
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              background: "rgba(183, 227, 106, 0.12)",
+                              border: "1px solid rgba(183, 227, 106, 0.25)",
+                              color: "var(--lime)"
+                            }}
+                            title={`${opt.variationName} (${opt.lineCount} master lines)`}
+                          >
+                            <strong>{opt.san}</strong> <span style={{ opacity: 0.75, fontSize: "10px" }}>({opt.variationName})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {onNavigateToOpenings && (
+                      <button
+                        className="button button-secondary button-small"
+                        style={{ fontSize: "11px" }}
+                        onClick={() => onNavigateToOpenings(m.openingFamily)}
+                      >
+                        Study Line →
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab 3: Results by Opening ── */}
+        {openingTab === "results" && (
+          <div>
+            {openingStatsRows.length > 0 ? (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", fontSize: "11px" }}>
+                      <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600 }}>Opening</th>
+                      <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Colour</th>
+                      <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Games</th>
+                      <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>W / D / L</th>
+                      <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Score %</th>
+                      <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600 }}>Avg. Left Theory</th>
+                      {onNavigateToOpenings && <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 600 }}>Action</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openingStatsRows.map((row, i) => {
+                      const score = ((row.wins + row.draws * 0.5) / row.games * 100).toFixed(0);
+                      const scoreNum = parseFloat(score);
+                      return (
+                        <tr
+                          key={`${row.colour}|${row.family}|${i}`}
+                          style={{ borderBottom: "1px solid var(--line)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}
+                        >
+                          <td style={{ padding: "8px 10px", fontWeight: 500, maxWidth: "260px" }}>
+                            <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {row.family}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px" }}>
+                            <span style={{
+                              display: "inline-block", width: "14px", height: "14px", borderRadius: "3px",
+                              background: row.colour === "black" ? "#101820" : "#ffffff",
+                              border: "1px solid var(--line)", verticalAlign: "middle"
+                            }} title={`Played as ${row.colour}`} />
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px", fontWeight: 600 }}>{row.games}</td>
+                          <td style={{ textAlign: "center", padding: "8px" }}>
+                            <span style={{ color: "#4ade80" }}>{row.wins}</span>
+                            {" / "}
+                            <span style={{ color: "#fbbf24" }}>{row.draws}</span>
+                            {" / "}
+                            <span style={{ color: "#f87171" }}>{row.losses}</span>
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px" }}>
+                            <span style={{
+                              fontWeight: 700,
+                              color: scoreNum >= 55 ? "var(--lime)" : scoreNum <= 40 ? "#f87171" : "var(--muted)"
+                            }}>
+                              {score}%
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px", color: "var(--muted)" }}>
+                            {row.avgLeftBookPly !== null
+                              ? `Move ${Math.ceil(row.avgLeftBookPly / 2)}`
+                              : "—"}
+                          </td>
+                          {onNavigateToOpenings && (
+                            <td style={{ textAlign: "right", padding: "8px 10px" }}>
+                              <button
+                                className="ol-link"
+                                style={{ fontSize: "11px", color: "var(--lime)", cursor: "pointer", background: "none", border: "none", textDecoration: "underline" }}
+                                onClick={() => onNavigateToOpenings(row.family)}
+                              >
+                                Study →
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: "12px" }}>
+                {book && games.length > 0
+                  ? "Play more games to see your results by opening."
+                  : book
+                  ? "Import games to see your opening statistics."
+                  : "Opening stats will appear once the book loads."}
+              </div>
+            )}
           </div>
         )}
       </div>

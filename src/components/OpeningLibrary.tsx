@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Search } from "lucide-react";
 import { useOpeningBook } from "../lib/openings/use-opening-book";
 import { useLineProgress } from "../lib/openings/use-line-progress";
@@ -11,14 +11,23 @@ interface LibraryProps {
   userId?: string | null;
   onAddLine: (line: BookOpening, side: OpeningSide) => Promise<number>;
   onViewRepertoire: () => void;
+  initialFamily?: string | null;
 }
 
 /** Loads the book, then shows either the browser or one opening. */
-export function OpeningLibrary({ userId, onAddLine, onViewRepertoire }: LibraryProps) {
+export function OpeningLibrary({ userId, onAddLine, onViewRepertoire, initialFamily }: LibraryProps) {
   const book = useOpeningBook();
   const families = useMemo(() => (book ? buildFamilies(book) : []), [book]);
   const { progress, record } = useLineProgress(userId);
-  const [selected, setSelected] = useState<{ name: string; lineKey: string | null } | null>(null);
+  const [selected, setSelected] = useState<{ name: string; lineKey: string | null } | null>(
+    initialFamily ? { name: initialFamily, lineKey: null } : null
+  );
+
+  useEffect(() => {
+    if (initialFamily) {
+      setSelected({ name: initialFamily, lineKey: null });
+    }
+  }, [initialFamily]);
 
   if (!book) {
     return (

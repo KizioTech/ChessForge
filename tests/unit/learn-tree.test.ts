@@ -58,6 +58,15 @@ describe("buildFamilies (real Lichess data)", () => {
       expect(f.ecoMin <= f.ecoMax).toBe(true);
     }
   });
+
+  it("ensures major variations reach master depth (8+ moves / 16+ plies)", () => {
+    const sicilian = fam("Sicilian Defense");
+    expect(sicilian.mainLine.moves!.length).toBeGreaterThanOrEqual(16); // >= 8 full moves
+    const italian = fam("Italian Game");
+    expect(italian.mainLine.moves!.length).toBeGreaterThanOrEqual(16);
+    const ruy = fam("Ruy Lopez");
+    expect(ruy.mainLine.moves!.length).toBeGreaterThanOrEqual(16);
+  });
 });
 
 describe("tree helpers", () => {

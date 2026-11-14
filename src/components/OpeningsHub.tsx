@@ -11,6 +11,7 @@ interface HubProps {
   userId?: string | null;
   games: GameRecord[];
   onOpenAnalysis?: (game: GameRecord) => void;
+  initialFamily?: string | null;
 }
 
 /**
@@ -18,7 +19,7 @@ interface HubProps {
  *  - Learn: browse every opening and variation, study it, practise it from memory.
  *  - My Repertoire: the lines you have chosen to play, once you know them.
  */
-export function OpeningsHub({ userId, games, onOpenAnalysis }: HubProps) {
+export function OpeningsHub({ userId, games, onOpenAnalysis, initialFamily }: HubProps) {
   const [mode, setMode] = useState<"learn" | "repertoire">("learn");
 
   async function addLine(line: BookOpening, side: OpeningSide): Promise<number> {
@@ -43,7 +44,12 @@ export function OpeningsHub({ userId, games, onOpenAnalysis }: HubProps) {
       </div>
 
       {mode === "learn" ? (
-        <OpeningLibrary userId={userId} onAddLine={addLine} onViewRepertoire={() => setMode("repertoire")} />
+        <OpeningLibrary
+          userId={userId}
+          onAddLine={addLine}
+          onViewRepertoire={() => setMode("repertoire")}
+          initialFamily={initialFamily}
+        />
       ) : (
         <OpeningsView
           userId={userId}
