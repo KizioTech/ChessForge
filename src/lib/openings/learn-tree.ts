@@ -30,6 +30,7 @@ export interface OpeningFamily {
   ecoMin: string;
   ecoMax: string;
   lineCount: number;
+  trapCount: number;
   root: VariationNode;
   /** The shortest line in the family: the natural starting point for study. */
   mainLine: BookOpening;
@@ -105,22 +106,38 @@ export function buildFamilies(book: OpeningBook): OpeningFamily[] {
         }
         node = child;
       }
-      // If two lines share a name, keep the shorter (more canonical) one.
-      if (!node.line || (line.moves?.length ?? 99) < (node.line.moves?.length ?? 99)) node.line = line;
+      // For traps, we preserve the full deep tactical sequence. For regular lines, keep the canonical/shorter one.
+      const isIncomingTrap = Boolean(line.isTrap || line.name.toLowerCase().includes("trap"));
+      const isExistingTrap = Boolean(node.line?.isTrap || node.line?.name.toLowerCase().includes("trap"));
+
+      if (!node.line) {
+        node.line = line;
+      } else if (isIncomingTrap && !isExistingTrap) {
+        node.line = line;
+      } else if (isIncomingTrap && isExistingTrap) {
+        if ((line.moves?.length ?? 0) > (node.line.moves?.length ?? 0)) {
+          node.line = line;
+        }
+      } else if (!isExistingTrap && (line.moves?.length ?? 99) < (node.line.moves?.length ?? 99)) {
+        node.line = line;
+      }
     }
     finishNode(root);
 
     const mainLine = lines.reduce((best, l) => ((l.moves?.length ?? 99) < (best.moves?.length ?? 99) ? l : best), lines[0]);
     const ecos = lines.map(l => l.eco).sort();
+    const realLines = leafLines(root);
+    const trapCount = realLines.filter(l => l.isTrap || l.name.toLowerCase().includes("trap")).length;
     families.push({
       name,
       side: sideOfFamily(name, mainLine.moves?.length ?? 1),
       ecoMin: ecos[0],
       ecoMax: ecos[ecos.length - 1],
       lineCount: root.lineCount,
+      trapCount,
       root,
       mainLine,
-      lineKeys: leafLines(root).map(lineKey)
+      lineKeys: realLines.map(lineKey)
     });
   }
   return families.sort((a, b) => b.lineCount - a.lineCount || a.name.localeCompare(b.name));
@@ -182,12 +199,20 @@ export function expandableIds(root: VariationNode): string[] {
 export function searchFamilies(
   families: OpeningFamily[],
   query: string,
-  side: OpeningSide | "all" = "all"
+  side: OpeningSide | "all" | "traps" = "all"
 ): OpeningFamily[] {
   const q = query.trim().toLowerCase();
-  return families.filter(f =>
-    (side === "all" || f.side === side) &&
-    (!q || f.name.toLowerCase().includes(q) || f.ecoMin.toLowerCase() === q ||
-      (q.length === 3 && f.ecoMin <= q.toUpperCase() && q.toUpperCase() <= f.ecoMax && /^[a-e]\d\d$/.test(q)))
-  );
+  return families.filter(f => {
+    if (side === "traps") {
+      if (f.trapCount === 0) return false;
+    } else if (side !== "all" && f.side !== side) {
+      return false;
+    }
+    return (
+      !q ||
+      f.name.toLowerCase().includes(q) ||
+      f.ecoMin.toLowerCase() === q ||
+      (q.length === 3 && f.ecoMin <= q.toUpperCase() && q.toUpperCase() <= f.ecoMax && /^[a-e]\d\d$/.test(q))
+    );
+  });
 }

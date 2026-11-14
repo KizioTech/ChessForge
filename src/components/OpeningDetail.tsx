@@ -264,11 +264,17 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
                 <>
                   <strong>{cursor === 0 ? "Starting position" : here ? here.name : "Beyond the named lines"}</strong>
                   {here && <span className="ol-eco">{here.eco}</span>}
+                  {(line.isTrap || line.name.toLowerCase().includes("trap")) && (
+                    <span className="ol-trap-tag">⚡ TRAP</span>
+                  )}
                 </>
               ) : (
                 <>
                   <strong>{line.name}</strong>
                   <span className="ol-eco">{line.eco}</span>
+                  {(line.isTrap || line.name.toLowerCase().includes("trap")) && (
+                    <span className="ol-trap-tag">⚡ TRAP</span>
+                  )}
                 </>
               )}
             </div>
@@ -307,6 +313,20 @@ export function OpeningDetail({ book, family, initialLineKey, progress, onRecord
               <button className="icon-btn" onClick={() => setFlipped(f => !f)} aria-label="Flip board" title="Flip board"><ArrowUpDown size={15} /></button>
             </div>
           </div>
+
+          {(line.trapMotif || line.trapDescription) && (
+            <div className="panel ol-card-pad ol-trap-card">
+              <div className="ol-trap-card-head" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span className="ol-trap-tag">⚡ TACTICAL MOTIF</span>
+                <strong style={{ fontSize: "14px", color: "var(--text)" }}>{line.trapMotif}</strong>
+              </div>
+              {line.trapDescription && (
+                <p className="ol-trap-card-desc" style={{ fontSize: "13px", color: "var(--soft)", margin: "8px 0 0", lineHeight: 1.5 }}>
+                  {line.trapDescription}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="panel ol-card-pad">
             <div className="ol-tabs" role="tablist">

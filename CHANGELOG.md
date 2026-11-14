@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Curated Opening Traps Catalog & Deep Variations (`src/data/openings/traps.ts`)**: Integrated 50 tactical chess opening traps (e.g. Légal's Mate, Noah's Ark, Siberian Trap, Elephant Trap, Lasker Trap, Cambridge Springs, Halosar, Blackburne Shilling, etc.) featuring full-length move sequences (up to 26 plies), tactical motif cards, explanatory descriptions, `⚡ Trap` tree badges, card trap counters, and a dedicated `⚡ Traps` library filter.
 - **Learn Openings & Opening Library (Learn First, Repertoire Second)**: Introduced dedicated `OpeningsHub` separating opening study into **Learn Openings** (default) and **My Repertoire**:
   - **Opening Library Browser (`OpeningLibrary.tsx`)**: 149 opening families with variation trees, cards with White/Black indicators, ECO ranges, line counts, search, and progress tracking.
   - **Interactive Opening Study & Practise (`OpeningDetail.tsx`)**: Study mode with forward/back navigation, theory continuations, and move replacement; Practise mode with memory testing, automatic opponent responses, hint arrows, mistake tracking, and mastery progression (3 consecutive clean runs).

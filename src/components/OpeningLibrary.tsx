@@ -67,7 +67,7 @@ export function LibraryBrowser({
   onOpen: (familyName: string, lineKey?: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [side, setSide] = useState<OpeningSide | "all">("all");
+  const [side, setSide] = useState<OpeningSide | "all" | "traps">("all");
   const [sort, setSort] = useState<SortKey>("lines");
   const [shown, setShown] = useState(PAGE);
 
@@ -82,6 +82,7 @@ export function LibraryBrowser({
   const allKeys = useMemo(() => families.flatMap(f => f.lineKeys), [families]);
   const overall = useMemo(() => summarizeProgress(allKeys, progress), [allKeys, progress]);
   const whiteCount = families.filter(f => f.side === "white").length;
+  const trapsFamilyCount = families.filter(f => f.trapCount > 0).length;
 
   const lastPracticed = useMemo(() => {
     const entries = Object.values(progress).filter(p => p.lastPracticedAt);
@@ -127,6 +128,7 @@ export function LibraryBrowser({
         <div className="ol-chips" role="group" aria-label="Filter by side">
           {([
             ["all", `All (${families.length})`],
+            ["traps", `⚡ Traps (${trapsFamilyCount})`],
             ["white", `As White (${whiteCount})`],
             ["black", `As Black (${families.length - whiteCount})`]
           ] as const).map(([value, label]) => (
@@ -148,7 +150,7 @@ export function LibraryBrowser({
       {filtered.length === 0 ? (
         <div className="ol-empty">
           <strong>No openings match “{query}”.</strong>
-          <p>Try a shorter name, an ECO code like C50, or clear the side filter.</p>
+          <p>Try a shorter name, an ECO code like C50, or clear the filter.</p>
         </div>
       ) : (
         <>
@@ -162,6 +164,11 @@ export function LibraryBrowser({
                   <div className="ol-card-top">
                     <span className={`ol-side ol-side-${f.side}`}>{f.side === "white" ? "White" : "Black"}</span>
                     <span className="ol-eco">{f.ecoMin === f.ecoMax ? f.ecoMin : `${f.ecoMin}–${f.ecoMax}`}</span>
+                    {f.trapCount > 0 && (
+                      <span className="ol-card-trap-badge" title={`${f.trapCount} known tactical traps in this opening`}>
+                        ⚡ {f.trapCount} {f.trapCount === 1 ? "trap" : "traps"}
+                      </span>
+                    )}
                   </div>
                   <strong className="ol-card-title">{f.name}</strong>
                   <span className="ol-card-meta">

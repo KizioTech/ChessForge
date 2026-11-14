@@ -89,6 +89,25 @@ describe("tree helpers", () => {
     expect(searchFamilies(families, "B90").some(f => f.name === "Sicilian Defense")).toBe(true);
     expect(searchFamilies(families, "", "white").every(f => f.side === "white")).toBe(true);
     expect(searchFamilies(families, "italian", "black").length).toBe(0);
+    const trapFamilies = searchFamilies(families, "", "traps");
+    expect(trapFamilies.length).toBeGreaterThan(10);
+    expect(trapFamilies.some(f => f.name === "Italian Game")).toBe(true);
+    expect(trapFamilies.some(f => f.name === "Sicilian Defense")).toBe(true);
+  });
+
+  it("populates and preserves deep trap lines in families", () => {
+    const sic = fam("Sicilian Defense");
+    expect(sic.trapCount).toBeGreaterThan(0);
+    const siberian = leafLines(sic.root).find(l => l.name.includes("Siberian Trap"));
+    expect(siberian).toBeTruthy();
+    expect(siberian!.moves!.length).toBeGreaterThanOrEqual(18); // 9 or 10 full moves
+    expect(siberian!.isTrap).toBe(true);
+
+    const italian = fam("Italian Game");
+    expect(italian.trapCount).toBeGreaterThan(0);
+    const legal = leafLines(italian.root).find(l => l.name.includes("Légal"));
+    expect(legal).toBeTruthy();
+    expect(legal!.moves!.length).toBe(15); // 1.e4..8.Nd5#
   });
 
   it("makes stable line keys", () => {

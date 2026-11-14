@@ -13,6 +13,9 @@ export interface BookOpening {
   pgn: string;
   /** SAN moves of the line, filled in by buildOpeningBook. */
   moves?: string[];
+  isTrap?: boolean;
+  trapMotif?: string;
+  trapDescription?: string;
 }
 
 export interface OpeningBook {
@@ -85,8 +88,20 @@ export function loadOpeningBook(): Promise<OpeningBook> {
       import("../../data/openings/b.tsv?raw"),
       import("../../data/openings/c.tsv?raw"),
       import("../../data/openings/d.tsv?raw"),
-      import("../../data/openings/e.tsv?raw")
-    ]).then(files => buildOpeningBook(files.flatMap(f => parseTsv(f.default))));
+      import("../../data/openings/e.tsv?raw"),
+      import("../../data/openings/traps")
+    ]).then(([a, b, c, d, e, trapsModule]) => {
+      const tsvOpenings = [a, b, c, d, e].flatMap(f => parseTsv(f.default));
+      const trapOpenings: BookOpening[] = trapsModule.KNOWN_TRAPS.map(t => ({
+        eco: t.eco,
+        name: t.name,
+        pgn: t.pgn,
+        isTrap: true,
+        trapMotif: t.motif,
+        trapDescription: t.description
+      }));
+      return buildOpeningBook([...tsvOpenings, ...trapOpenings]);
+    });
   }
   return bookPromise;
 }
