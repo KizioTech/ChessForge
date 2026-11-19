@@ -68,6 +68,7 @@ export async function saveGeneratedExercises(
     ease_factor: SM2_DEFAULTS.INITIAL_EASE,
     repetitions: 0,
     lapses: 0,
+    consecutive_successes: 0,
     created_at: nowIso,
     updated_at: nowIso
   }));
@@ -88,7 +89,7 @@ export async function saveGeneratedExercises(
   const existingMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
   const mistakeMap = new Map<string, MistakeRecord>();
   existingMistakes.forEach(m => mistakeMap.set(m.id, m));
-  mistakes.forEach(m => mistakeMap.set(m.id, m));
+  mistakes.forEach(m => mistakeMap.set(m.id, { ...m, source: "stockfish" }));
   saveLocal(LS_MISTAKES, Array.from(mistakeMap.values()));
 
   // 3. Remote Supabase persistence (if authenticated with UUID and not skipped)
@@ -152,8 +153,9 @@ export async function syncLocalTrainingToSupabase(userId?: string): Promise<void
     const allMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
     const allExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
 
+    // Only upload real engine-verified mistakes (source === "stockfish")
     const validMistakes = allMistakes
-      .filter(m => isRealUuid(m.game_id))
+      .filter(m => isRealUuid(m.game_id) && m.source !== "heuristic")
       .map(m => ({
         ...m,
         id: isRealUuid(m.id) ? m.id : undefined,
@@ -246,7 +248,8 @@ export async function recordAttemptAndAdvanceSchedule(
       repetitions: currentSched?.repetitions ?? 0,
       easeFactor: currentSched?.ease_factor ?? SM2_DEFAULTS.INITIAL_EASE,
       intervalDays: currentSched?.interval_days ?? 1,
-      lapses: currentSched?.lapses ?? 0
+      lapses: currentSched?.lapses ?? 0,
+      consecutiveSuccesses: currentSched?.consecutive_successes ?? 0
     },
     attempt.grade,
     now
@@ -260,6 +263,7 @@ export async function recordAttemptAndAdvanceSchedule(
     ease_factor: sm2Result.easeFactor,
     repetitions: sm2Result.repetitions,
     lapses: sm2Result.lapses,
+    consecutive_successes: sm2Result.consecutiveSuccesses,
     last_reviewed_at: now.toISOString(),
     updated_at: now.toISOString()
   };

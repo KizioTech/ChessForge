@@ -7,6 +7,8 @@
 
 export type MistakeClass = "inaccuracy" | "mistake" | "blunder";
 
+export type MistakeSource = "stockfish" | "heuristic";
+
 export interface MistakeRecord {
   id: string;
   user_id: string;
@@ -24,6 +26,7 @@ export interface MistakeRecord {
   tag_confidence?: Record<string, number>;
   user_corrected: boolean;
   note?: string | null;
+  source?: MistakeSource;
   created_at?: string;
 }
 
@@ -69,6 +72,7 @@ export interface ReviewScheduleRecord {
   ease_factor: number;
   repetitions: number;
   lapses: number;
+  consecutive_successes?: number;
   last_reviewed_at?: string | null;
   created_at?: string;
   updated_at?: string;

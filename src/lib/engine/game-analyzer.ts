@@ -96,6 +96,39 @@ export async function analyzeGame(
       }
 
       const p = plies[i];
+
+      // Terminal position check (checkmate or stalemate): resolve with chess.js directly
+      const terminalChess = new Chess(p.fen);
+      if (terminalChess.isGameOver()) {
+        const whiteToMove = terminalChess.turn() === "w";
+        const isMate = terminalChess.isCheckmate();
+        const winProbability = isMate ? (whiteToMove ? 0.0 : 100.0) : 50.0;
+        const terminalEval: PositionEvaluation = {
+          ply: p.ply,
+          fen: p.fen,
+          depth: 0,
+          scoreCp: isMate ? null : 0,
+          mateIn: isMate ? (whiteToMove ? -0 : 0) : null,
+          winProbability,
+          bestMoveUci: "",
+          bestMoveSan: "",
+          lines: [],
+          moveSan: p.moveSan,
+          moveUci: p.moveUci
+        };
+        evaluatedPositions.push(terminalEval);
+
+        if (onProgress) {
+          onProgress({
+            currentPly: i + 1,
+            totalPlies,
+            percent: Math.round(((i + 1) / totalPlies) * 100),
+            evaluation: terminalEval
+          });
+        }
+        continue;
+      }
+
       const evaluation = await engine.evaluatePosition(p.fen, {
         depth,
         multiPv,

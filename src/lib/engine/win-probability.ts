@@ -15,12 +15,20 @@ const EXP_COEFFICIENT = -0.00368208;
 /**
  * Calculates win probability (0.0 to 100.0) from White's perspective
  * given a White-relative centipawn score or forced mate distance.
+ * When mateIn is 0, sideToMove must be provided ("w" or "b").
  */
 export function calculateWinProbability(
   scoreCp: number | null,
-  mateIn: number | null
+  mateIn: number | null,
+  sideToMove?: "w" | "b"
 ): number {
   if (mateIn !== null) {
+    if (mateIn === 0) {
+      if (!sideToMove) return 50.0;
+      // If White is to move and checkmated, White has 0% win prob.
+      // If Black is to move and checkmated, White has 100% win prob.
+      return sideToMove === "w" ? 0.0 : 100.0;
+    }
     if (mateIn > 0) return 100.0;
     if (mateIn < 0) return 0.0;
     return 50.0;

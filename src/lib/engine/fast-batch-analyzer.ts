@@ -21,14 +21,14 @@ import { syncLocalTrainingToSupabase } from "../training/training-service";
 import type { MistakeRecord } from "../training/types";
 
 // Local storage key for the screening mistakes cache (separate from full exercise mistakes)
-const LS_SCREENING_MISTAKES = "chessforge:mistakes";
+export const LS_SCREENING_MISTAKES = "chessforge:screening-mistakes";
 
 function saveScreeningMistakes(newMistakes: MistakeRecord[]): void {
   try {
     const existing: MistakeRecord[] = JSON.parse(localStorage.getItem(LS_SCREENING_MISTAKES) || "[]");
     const map = new Map<string, MistakeRecord>();
     existing.forEach(m => map.set(`${m.game_id}-${m.ply}`, m));
-    newMistakes.forEach(m => map.set(`${m.game_id}-${m.ply}`, m));
+    newMistakes.forEach(m => map.set(`${m.game_id}-${m.ply}`, { ...m, source: "heuristic" }));
     localStorage.setItem(LS_SCREENING_MISTAKES, JSON.stringify(Array.from(map.values())));
   } catch {
     // ignore storage errors
@@ -308,7 +308,8 @@ export async function fastAnalyzeGame(
         best_san: r.bestSan || null,
         tags: r.tags ?? [],
         tag_confidence: {},
-        user_corrected: false
+        user_corrected: false,
+        source: "heuristic" as const
       }));
 
     if (screeningMistakes.length > 0) {
