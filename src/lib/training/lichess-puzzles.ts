@@ -9,6 +9,7 @@
  */
 
 import { Chess, type Square } from "chess.js";
+import { CURATED_PUZZLES } from "./curated-puzzles";
 
 const LS_KEY = "chessforge:lichess-puzzles";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -171,54 +172,67 @@ export async function fetchPuzzleBatch(nb = 20, themes: string[] = []): Promise<
 }
 
 /** Built-in curated offline fallback puzzles if network is down */
-export const FALLBACK_PUZZLES: LichessPuzzle[] = [
-  {
-    id: "offline-1",
-    rating: 1350,
-    themes: ["endgame", "mate", "mateIn1", "backRankMate"],
-    initialFen: "6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1",
-    solution: ["e1e8"],
-    pgn: ""
-  },
-  {
-    id: "offline-2",
-    rating: 1420,
-    themes: ["fork", "middlegame", "advantage"],
-    initialFen: "r2q1rk1/ppp2ppp/8/3n4/8/2N5/PPP2PPP/R2Q1RK1 w - - 0 1",
-    solution: ["c3d5"],
-    pgn: ""
-  },
-  {
-    id: "offline-3",
-    rating: 1550,
-    themes: ["endgame", "pawnEndgame", "promotion"],
-    initialFen: "8/4P3/8/8/4k3/8/8/4K3 w - - 0 1",
-    solution: ["e7e8q"],
-    pgn: ""
-  }
-];
+export const FALLBACK_PUZZLES: LichessPuzzle[] = CURATED_PUZZLES;
 
-/** Load puzzles from cache; if empty/stale, fetch a new batch. */
+/** Known historical Lichess puzzle IDs to seed the archive */
+export const ARCHIVED_LICHESS_IDS = ["f9Xve", "00008", "0009B", "000aY"];
+
+/** Fetch a single Lichess puzzle by ID */
+export async function fetchPuzzleById(id: string): Promise<LichessPuzzle | null> {
+  try {
+    const res = await fetch(`https://lichess.org/api/puzzle/${id}`, {
+      headers: { Accept: "application/json" }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const p = data.puzzle;
+    const g = data.game;
+    if (!p) return null;
+    let fen: string | null = p.fen ?? null;
+    if (!fen || fen.trim().length === 0) {
+      fen = extractFenAtPly(g?.pgn ?? "", p?.initialPly);
+    }
+    if (!fen) return null;
+    return {
+      id: p.id,
+      rating: p.rating,
+      themes: p.themes ?? [],
+      initialFen: fen,
+      solution: p.solution ?? [],
+      pgn: g?.pgn ?? ""
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Load puzzles from cache; if empty/stale, fetch daily and merge with curated library. */
 export async function getOrFetchPuzzles(themes: string[] = []): Promise<LichessPuzzle[]> {
   const cached = loadCachedPuzzles();
-  if (cached.length > 0) return cached;
+  if (cached.length >= 10) return cached;
 
-  // Try batch first; fall back to daily
-  const batch = await fetchPuzzleBatch(20, themes);
-  if (batch.length > 0) {
-    savePuzzleCache(batch);
-    return batch;
-  }
+  const puzzleMap = new Map<string, LichessPuzzle>();
 
-  // Fallback: daily puzzle
-  const daily = await fetchDailyPuzzle();
-  if (daily) {
-    savePuzzleCache([daily]);
-    return [daily];
-  }
+  // 1. Add all 40 verified curated puzzles first
+  CURATED_PUZZLES.forEach(p => puzzleMap.set(p.id, p));
 
-  // Offline fallback
-  return FALLBACK_PUZZLES;
+  // 2. Fetch daily puzzle from live Lichess API
+  try {
+    const daily = await fetchDailyPuzzle();
+    if (daily) puzzleMap.set(daily.id, daily);
+  } catch { /* ignore network error */ }
+
+  // 3. Try fetching live archived Lichess puzzles
+  try {
+    const liveArchives = await Promise.all(ARCHIVED_LICHESS_IDS.map(fetchPuzzleById));
+    liveArchives.filter(Boolean).forEach(p => {
+      if (p) puzzleMap.set(p.id, p);
+    });
+  } catch { /* ignore network error */ }
+
+  const combined = Array.from(puzzleMap.values());
+  savePuzzleCache(combined);
+  return combined;
 }
 
 /** Convert a UCI move string (e.g. 'e2e4' or 'e7e8q') into SAN given the current board state */
