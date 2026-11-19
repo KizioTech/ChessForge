@@ -9,6 +9,8 @@
  */
 
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { remote } from "./remote";
+import { dbGetGames, dbPutGames, dbDeleteGame } from "./repository";
 import type { ParsedGame, TimeClass } from "./pgn-parser";
 
 export interface GameRecord {
@@ -63,38 +65,48 @@ function saveLocalGames(games: GameRecord[]): void {
 }
 
 /**
- * Fetch all games for the current user (from Supabase if authenticated, or local storage).
+ * Fetch all games for the current user (from Supabase if authenticated, or IndexedDB / local storage).
  */
 export async function getGames(userId?: string | null): Promise<GameRecord[]> {
   if (isSupabaseConfigured && userId) {
-    const { data, error } = await supabase
-      .from("games")
-      .select("*")
-      .order("played_at", { ascending: false, nullsFirst: false });
+    const result = await remote<GameRecord[]>(
+      signal =>
+        supabase
+          .from("games")
+          .select("*")
+          .order("played_at", { ascending: false, nullsFirst: false })
+          .abortSignal(signal) as any,
+      { label: "games.select", timeoutMs: 8000 }
+    );
 
-    if (!error && data) {
-      const remoteGames = data.map(row => ({
+    if (result.ok && result.data) {
+      const remoteGames = result.data.map(row => ({
         ...row,
         moves_count: row.moves_count || 0
       })) as GameRecord[];
 
       if (remoteGames.length > 0) {
+        // Cache to IndexedDB for instant offline access
+        dbPutGames(remoteGames).catch(() => {});
         return remoteGames;
       }
 
-      // If remote returned 0 games, check local storage in case of offline/fallback saves
+      // If remote returned 0 games, check IndexedDB then local storage
+      const idbGames = await dbGetGames(userId).catch(() => []);
+      if (idbGames.length > 0) return idbGames;
+
       const local = getLocalGames();
-      if (local.length > 0) {
-        return local;
-      }
+      if (local.length > 0) return local;
       return [];
     }
-    if (error) {
-      console.warn("Could not fetch remote games from Supabase, using local cache:", error.message);
+    if (!result.ok) {
+      console.warn("Could not fetch remote games from Supabase, checking local repositories:", result.message);
     }
   }
 
-  // Fallback to local storage
+  // Check IndexedDB first, then fallback to local storage
+  const idb = await dbGetGames(userId).catch(() => []);
+  if (idb.length > 0) return idb;
   return getLocalGames();
 }
 
@@ -169,34 +181,34 @@ export async function saveParsedGames(
     return result;
   }
 
+  // Dual-write to IndexedDB and local storage cache
+  dbPutGames(newRecords).catch(() => {});
+  const merged = [...newRecords, ...existingGames];
+  saveLocalGames(merged);
+
   // If Supabase is configured and user is signed in, save to database
   if (isSupabaseConfigured && userId) {
-    const { data, error } = await supabase
-      .from("games")
-      .insert(
-        newRecords.map(r => {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.id);
-          const { id, ...rest } = r;
-          return isUuid
-            ? { ...r, user_id: userId }
-            : { ...rest, user_id: userId };
-        })
-      )
-      .select();
+    const insertRows = newRecords.map(r => {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.id);
+      const { id, ...rest } = r;
+      return isUuid
+        ? { ...r, user_id: userId }
+        : { ...rest, user_id: userId };
+    });
 
-    if (error) {
-      console.error("Supabase insert error:", error.message);
-      // Fallback save to local storage
-      const merged = [...newRecords, ...existingGames];
-      saveLocalGames(merged);
+    const res = await remote<GameRecord[]>(
+      signal => supabase.from("games").insert(insertRows).abortSignal(signal).select(),
+      { label: "games.insert" }
+    );
+
+    if (res.ok && res.data) {
+      result.saved = res.data as GameRecord[];
+    } else {
+      console.warn("Supabase insert error (games saved locally):", res.ok ? "No data" : res.message);
       result.saved = newRecords;
-    } else if (data) {
-      result.saved = data as GameRecord[];
     }
   } else {
     // Unauthenticated local session
-    const merged = [...newRecords, ...existingGames];
-    saveLocalGames(merged);
     result.saved = newRecords;
   }
 
@@ -207,14 +219,23 @@ export async function saveParsedGames(
  * Delete a game by ID.
  */
 export async function deleteGame(gameId: string, userId?: string | null): Promise<boolean> {
-  if (isSupabaseConfigured && userId) {
-    const { error } = await supabase.from("games").delete().eq("id", gameId);
-    if (!error) return true;
-  }
-
+  // Always remove from IndexedDB and local storage
+  dbDeleteGame(gameId).catch(() => {});
   const existing = getLocalGames();
   const filtered = existing.filter(g => g.id !== gameId);
   saveLocalGames(filtered);
+
+  if (isSupabaseConfigured && userId) {
+    const res = await remote(
+      signal => supabase.from("games").delete().eq("id", gameId).abortSignal(signal),
+      { label: "games.delete" }
+    );
+    if (!res.ok) {
+      console.warn("Remote delete failed:", res.message);
+    }
+    return true;
+  }
+
   return true;
 }
 

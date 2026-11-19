@@ -40,6 +40,7 @@ import {
   markHydrationDone,
   type TrainingStats
 } from "./lib/training/training-service";
+import { flushOutbox } from "./lib/outbox";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "./lib/export";
 import { getWeaknessAnalysis, type WeaknessAnalysisReport } from "./lib/insight/trend-service";
 import { runAutoSync } from "./lib/sync/auto-sync";
@@ -242,6 +243,9 @@ function App() {
     if (!user?.id) return;
 
     const hydrate = async (userId: string) => {
+      // Flush any queued offline writes from previous sessions
+      flushOutbox(userId).catch(() => {});
+
       if (!isHydrationDue(userId)) return;
       markHydrationDone(userId);
       hydrationRef.current = userId;

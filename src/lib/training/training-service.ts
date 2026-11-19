@@ -1,11 +1,24 @@
 /**
  * training-service.ts — Persistence and retrieval for mistakes, exercises, and review schedule.
  *
- * Implements dual-layer storage (Supabase + LocalStorage fallback) adhering to ADR 0002 & ADR 0009.
+ * Implements dual-layer storage (Supabase + IndexedDB primary + LocalStorage cache)
+ * adhering to ADR 0002 & ADR 0009.
+ *
+ * Storage hierarchy (Item 10):
+ *   1. IndexedDB (Dexie) — primary local store, quota-safe, structured queries
+ *   2. localStorage — legacy write-through cache (preserved for offline fallback compat)
+ *   3. Supabase — remote authoritative store for authenticated users
  */
 
 import { supabase, isSupabaseConfigured } from "../supabase";
 import { remote } from "../remote";
+import { enqueueOutbox } from "../outbox";
+import {
+  dbGetExercises, dbPutExercises, dbUpdateExercise,
+  dbGetSchedules, dbPutSchedule, dbPutSchedules,
+  dbGetAttempts, dbAddAttempt, dbBulkAddAttempts,
+  dbGetMistakes, dbPutMistakes
+} from "../repository";
 import type {
   TrainingExerciseRecord,
   MistakeRecord,
@@ -74,24 +87,30 @@ export async function saveGeneratedExercises(
     updated_at: nowIso
   }));
 
-  // 2. LocalStorage dual-layer persistence (instant offline cache)
+  // 2. IndexedDB primary store + localStorage write-through cache
   const existingExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
   const exerciseMap = new Map<string, TrainingExerciseRecord>();
   existingExercises.forEach(e => exerciseMap.set(e.id, e));
   exercises.forEach(e => exerciseMap.set(e.id, e));
   saveLocal(LS_EXERCISES, Array.from(exerciseMap.values()));
+  // IndexedDB dual-write (non-blocking, non-fatal)
+  dbPutExercises(exercises).catch(err => console.warn("[DB] exercises put failed:", err));
 
   const existingSchedule = getLocal<ReviewScheduleRecord>(LS_SCHEDULE);
   const scheduleMap = new Map<string, ReviewScheduleRecord>();
   existingSchedule.forEach(s => scheduleMap.set(s.exercise_id, s));
   schedules.forEach(s => scheduleMap.set(s.exercise_id, s));
   saveLocal(LS_SCHEDULE, Array.from(scheduleMap.values()));
+  // IndexedDB dual-write
+  dbPutSchedules(schedules).catch(err => console.warn("[DB] schedules put failed:", err));
 
   const existingMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
   const mistakeMap = new Map<string, MistakeRecord>();
   existingMistakes.forEach(m => mistakeMap.set(m.id, m));
   mistakes.forEach(m => mistakeMap.set(m.id, { ...m, source: "stockfish" }));
   saveLocal(LS_MISTAKES, Array.from(mistakeMap.values()));
+  // IndexedDB dual-write (only stockfish-sourced)
+  dbPutMistakes(mistakes.map(m => ({ ...m, source: "stockfish" as const }))).catch(err => console.warn("[DB] mistakes put failed:", err));
 
   // 3. Remote Supabase persistence (if authenticated with UUID and not skipped)
   if (!options?.skipRemoteSync && userId && isRealUuid(userId)) {
@@ -285,23 +304,24 @@ export async function recordAttemptAndAdvanceSchedule(
     updated_at: now.toISOString()
   };
 
-  // Update schedule locally
+  // Update schedule locally (localStorage + IndexedDB dual-write)
   const newSchedules = allSchedules.filter(s => s.exercise_id !== exercise.id);
   newSchedules.push(updatedSched);
   saveLocal(LS_SCHEDULE, newSchedules);
+  dbPutSchedule(updatedSched).catch(err => console.warn("[DB] schedule update failed:", err));
 
-  // If mastered, update exercise status
+  // If mastered, update exercise status (localStorage + IndexedDB)
   if (sm2Result.isMastered) {
     const allExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
     const updatedExercises = allExercises.map(e =>
       e.id === exercise.id ? { ...e, status: "mastered" as const } : e
     );
     saveLocal(LS_EXERCISES, updatedExercises);
+    dbUpdateExercise(exercise.id, { status: "mastered" }).catch(err => console.warn("[DB] exercise mastered update failed:", err));
   }
 
-  // Save attempt
-  const attempts = getLocal<ExerciseAttemptRecord>(LS_ATTEMPTS);
-  attempts.push({
+  // Save attempt (localStorage + IndexedDB)
+  const attemptRecord: ExerciseAttemptRecord = {
     exercise_id: exercise.id,
     user_id: userId || LOCAL_GUEST_USER_ID,
     attempted_at: now.toISOString(),
@@ -310,8 +330,11 @@ export async function recordAttemptAndAdvanceSchedule(
     hints_used: attempt.hintsUsed,
     moves_tried: attempt.movesTried,
     grade: attempt.grade
-  });
+  };
+  const attempts = getLocal<ExerciseAttemptRecord>(LS_ATTEMPTS);
+  attempts.push(attemptRecord);
   saveLocal(LS_ATTEMPTS, attempts);
+  dbAddAttempt(attemptRecord).catch(err => console.warn("[DB] attempt insert failed:", err));
 
   // Remote update if authenticated
   if (userId && isRealUuid(userId) && isRealUuid(exercise.id)) {
@@ -320,7 +343,13 @@ export async function recordAttemptAndAdvanceSchedule(
       { label: "attempt.schedule.upsert" }
     );
     if (!rSched.ok) {
-      console.warn("Remote schedule update failed:", rSched.message);
+      console.warn("Remote schedule update failed, enqueuing to outbox:", rSched.message);
+      enqueueOutbox({
+        table: "review_schedule",
+        operation: "upsert",
+        userId,
+        payload: updatedSched as any
+      }).catch(() => {});
     }
 
     if (sm2Result.isMastered) {
@@ -329,24 +358,37 @@ export async function recordAttemptAndAdvanceSchedule(
         { label: "attempt.exercise.mastered" }
       );
       if (!rEx.ok) {
-        console.warn("Remote exercise mastery update failed:", rEx.message);
+        console.warn("Remote exercise mastery update failed, enqueuing to outbox:", rEx.message);
+        enqueueOutbox({
+          table: "training_exercises",
+          operation: "upsert",
+          userId,
+          payload: { id: exercise.id, status: "mastered" }
+        }).catch(() => {});
       }
     }
 
+    const attemptPayload = {
+      exercise_id: exercise.id,
+      user_id: userId,
+      correct: attempt.correct,
+      duration_ms: attempt.durationMs,
+      hints_used: attempt.hintsUsed,
+      moves_tried: attempt.movesTried,
+      grade: attempt.grade
+    };
     const rAttempt = await remote(
-      s => supabase.from("exercise_attempts").insert({
-        exercise_id: exercise.id,
-        user_id: userId,
-        correct: attempt.correct,
-        duration_ms: attempt.durationMs,
-        hints_used: attempt.hintsUsed,
-        moves_tried: attempt.movesTried,
-        grade: attempt.grade
-      }).abortSignal(s).select(),
+      s => supabase.from("exercise_attempts").insert(attemptPayload).abortSignal(s).select(),
       { label: "attempt.insert" }
     );
     if (!rAttempt.ok) {
-      console.warn("Remote attempt insert failed:", rAttempt.message);
+      console.warn("Remote attempt insert failed, enqueuing to outbox:", rAttempt.message);
+      enqueueOutbox({
+        table: "exercise_attempts",
+        operation: "upsert",
+        userId,
+        payload: attemptPayload as any
+      }).catch(() => {});
     }
   }
 
@@ -519,6 +561,8 @@ export async function pullTrainingState(
     }
 
     saveLocal(LS_EXERCISES, Array.from(localMap.values()));
+    // Also write merged set to IndexedDB
+    dbPutExercises(Array.from(localMap.values())).catch(() => {});
   }
 
   // ── 2. Review schedules ───────────────────────────────────────────────────
@@ -552,6 +596,8 @@ export async function pullTrainingState(
     }
 
     saveLocal(LS_SCHEDULE, Array.from(localMap.values()));
+    // Also write merged set to IndexedDB
+    dbPutSchedules(Array.from(localMap.values())).catch(() => {});
   }
 
   // ── 3. Exercise attempts (last 500) ───────────────────────────────────────
@@ -586,6 +632,7 @@ export async function pullTrainingState(
 
     if (toAdd.length > 0) {
       saveLocal(LS_ATTEMPTS, [...local, ...toAdd]);
+      dbBulkAddAttempts(toAdd).catch(() => {});
     }
   }
 
