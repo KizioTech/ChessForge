@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated CI workflow (`.github/workflows/ci.yml`) to run `npm run build` validating both Vite frontend and Electron TypeScript.
 
 ### Added
+- **Syzygy 7-Piece Endgame Tablebase Integration (`src/lib/endgames/tablebase.ts`, `src/components/EndgameLab.tsx`)**:
+  - Integrated public CC0 7-piece tablebase API via Lichess (`https://tablebase.lichess.ovh/standard`).
+  - Automatically probes theoretical outcomes (Win, Draw, Loss, Cursed Win, Blessed Loss) with exact distance-to-mate (DTM) and distance-to-zeroing (DTZ) for any endgame position with $\le 7$ pieces.
+  - Interactive tablebase card in `EndgameDrillRoom` showing real-time theoretical verdict, distance to mate/zeroing, and optimal candidate moves.
+  - Added 7-piece Syzygy indicators to `CurriculumBrowser` cards.
+  - Bounded in-memory LRU caching with 120-entry capacity, 5s timeout safety, and offline resilience.
+  - 9/9 automated unit tests verifying piece counting, FEN parsing, outcome formatting, caching, and network resilience.
 - **Open-Source Lichess Puzzle Integration in Training Tab (`src/lib/training/lichess-puzzles.ts`, `src/components/PuzzleTrainer.tsx`, `src/components/TrainingDesk.tsx`)**:
   - Integrated open-source, CC0-licensed puzzles from Lichess via daily puzzle and batch API endpoints with local caching (`chessforge:lichess-puzzles`) and 24-hour TTL.
   - Added built-in curated offline fallback puzzle sets ensuring zero interruptions in Electron desktop mode without internet connectivity.

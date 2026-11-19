@@ -7,3 +7,4 @@ export * from "./curriculum";
 export * from "./endgame-practice";
 export * from "./endgame-progress";
 export * from "./endgame-miner";
+export * from "./tablebase";

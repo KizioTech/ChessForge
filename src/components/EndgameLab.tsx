@@ -14,7 +14,8 @@ import {
   Filter,
   Check,
   BookOpen,
-  Crosshair
+  Crosshair,
+  Database
 } from "lucide-react";
 import { BoardView } from "./BoardView";
 import type { GameRecord } from "../lib/games";
@@ -30,6 +31,10 @@ import {
   isUserTurn,
   isCleanRun,
   getSavedMinedEndgames,
+  probeTablebase,
+  canProbeTablebase,
+  formatTablebaseOutcome,
+  type TablebaseResult,
   type EndgamePosition,
   type EndgameCategory,
   type EndgameDifficulty,
@@ -462,6 +467,24 @@ function CurriculumBrowser({
                     >
                       {pos.objective === "win" ? "🏆 Win" : "🛡️ Draw"}
                     </span>
+                    {canProbeTablebase(pos.fen) && (
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          padding: "2px 5px",
+                          borderRadius: "4px",
+                          background: "rgba(183, 227, 106, 0.08)",
+                          color: "var(--lime)",
+                          border: "1px solid rgba(183, 227, 106, 0.25)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px"
+                        }}
+                      >
+                        <Database size={9} /> 7-Piece
+                      </span>
+                    )}
                   </div>
 
                   <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "capitalize" }}>
@@ -535,6 +558,8 @@ function EndgameDrillRoom({
   const [feedback, setFeedback] = useState<string>("");
   const [hintActive, setHintActive] = useState<boolean>(false);
   const [flipped, setFlipped] = useState(false);
+  const [tablebaseResult, setTablebaseResult] = useState<TablebaseResult | null>(null);
+  const [isProbing, setIsProbing] = useState<boolean>(false);
   const recorded = useRef(false);
   const timer = useRef<number | undefined>(undefined);
 
@@ -550,6 +575,29 @@ function EndgameDrillRoom({
     () => chessAtEndgamePly(position, state.history),
     [position, state.history]
   );
+
+  // Probe Syzygy 7-piece tablebase on position updates
+  useEffect(() => {
+    const fen = currentBoard.fen();
+    if (!canProbeTablebase(fen)) {
+      setTablebaseResult(null);
+      setIsProbing(false);
+      return;
+    }
+
+    let active = true;
+    setIsProbing(true);
+    probeTablebase(fen).then(res => {
+      if (active) {
+        setTablebaseResult(res);
+        setIsProbing(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [currentBoard]);
 
   const userTurn = isUserTurn(state.ply);
   const currentOrientation = flipped
@@ -723,6 +771,80 @@ function EndgameDrillRoom({
               {position.explanation}
             </p>
           </div>
+
+          {/* Syzygy 7-Piece Tablebase Probe Card */}
+          {canProbeTablebase(currentBoard.fen()) && (
+            <div
+              style={{
+                padding: "12px 14px",
+                background: "var(--panel)",
+                borderRadius: "10px",
+                border: "1px solid var(--line)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Database size={14} style={{ color: "var(--lime)" }} />
+                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--muted)" }}>
+                    7-Piece Syzygy Tablebase
+                  </span>
+                </div>
+                {tablebaseResult && (
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      background: `${formatTablebaseOutcome(tablebaseResult).badgeColor}1a`,
+                      color: formatTablebaseOutcome(tablebaseResult).badgeColor,
+                      border: `1px solid ${formatTablebaseOutcome(tablebaseResult).badgeColor}40`
+                    }}
+                  >
+                    {formatTablebaseOutcome(tablebaseResult).headline}
+                  </span>
+                )}
+              </div>
+
+              {isProbing ? (
+                <span style={{ fontSize: "12px", color: "var(--muted)" }}>Probing tablebase…</span>
+              ) : tablebaseResult ? (
+                <>
+                  <span style={{ fontSize: "12px", color: "var(--soft)", lineHeight: 1.4 }}>
+                    {formatTablebaseOutcome(tablebaseResult).detail}
+                  </span>
+                  {tablebaseResult.moves.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "2px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--muted)", alignSelf: "center" }}>Optimal moves:</span>
+                      {tablebaseResult.moves.slice(0, 5).map((m, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            fontSize: "11px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            background: m.category === "win" ? "rgba(34, 197, 94, 0.15)" : m.category === "draw" ? "rgba(56, 189, 248, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                            color: m.category === "win" ? "#4ade80" : m.category === "draw" ? "#38bdf8" : "#f87171",
+                            border: "1px solid rgba(255, 255, 255, 0.08)",
+                            fontFamily: "var(--mono)"
+                          }}
+                        >
+                          {m.san} {m.dtm !== null ? `(M${Math.abs(m.dtm)})` : m.dtz !== null ? `(Z${Math.abs(m.dtz)})` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                  Connecting to tablebase…
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Practice Feedback / Hint Card */}
           {hintActive && currentExpected && (

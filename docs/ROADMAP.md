@@ -176,7 +176,7 @@ Before closing any phase, every item below must be satisfied:
   - [x] Theoretical endgame curriculum covering King & Pawn, Rook endgames, Minor pieces, Queen endgames, and Checkmates.
   - [x] Interactive Endgame Lab UI (`EndgameLab.tsx`) with category filtering, difficulty selection, and search.
   - [x] Real-time drill room with opponent auto-responses, hints, rule cards, and mastery progression.
-  - [ ] Online tablebase probe integration (Syzygy/Lichess tablebase API).
+  - [x] Online tablebase probe integration (Syzygy/Lichess 7-piece tablebase API).
   - [ ] Blindfold/Calculation memory drill mode.
 
 ---
