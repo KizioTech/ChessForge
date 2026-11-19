@@ -49,7 +49,9 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   });
 
@@ -60,8 +62,20 @@ function createWindow() {
     void win.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 
+  // Restrict navigation inside the window
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isDev && url.startsWith(process.env.VITE_DEV_SERVER_URL!)) return;
+    if (!isDev && url.startsWith("file://")) return;
+    event.preventDefault();
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+  });
+
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("https://")) void shell.openExternal(url);
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
     return { action: "deny" };
   });
 }
