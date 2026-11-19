@@ -58,7 +58,7 @@ describe("lichess-puzzles", () => {
   });
 
   it("has curated fallback puzzles ready when offline", () => {
-    expect(FALLBACK_PUZZLES.length).toBeGreaterThanOrEqual(3);
+    expect(FALLBACK_PUZZLES.length).toBeGreaterThanOrEqual(40);
     expect(FALLBACK_PUZZLES[0].solution.length).toBeGreaterThan(0);
   });
 });
