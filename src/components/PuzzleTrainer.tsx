@@ -32,7 +32,7 @@ export function PuzzleTrainer({ onBack }: PuzzleTrainerProps) {
   const [game, setGame] = useState<Chess>(new Chess());
   const [solvingStatus, setSolvingStatus] = useState<"solving" | "correct" | "incorrect" | "revealed">("solving");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [solutionIndex, setSolutionIndex] = useState(1); // 0 is opponent setup move, 1 is user's first move
+  const [solutionIndex, setSolutionIndex] = useState(0); // 0 is user's first move
   const [hintActive, setHintActive] = useState(false);
   const [solvedCount, setSolvedCount] = useState(0);
 
