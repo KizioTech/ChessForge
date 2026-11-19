@@ -455,3 +455,165 @@ export function getTrainingStats(userId?: string): TrainingStats {
   };
 }
 
+// ── Item 1.5: Training Cloud Hydration ───────────────────────────────────────
+
+export interface HydrationResult {
+  exercisesMerged: number;
+  schedulesMerged: number;
+  attemptsMerged: number;
+}
+
+/**
+ * Pull the authenticated user's training state from Supabase and merge it into
+ * local storage, keeping the most-recently-updated record when duplicates exist.
+ *
+ * Call on:
+ *  - Login (user just authenticated on this device)
+ *  - App-focus restore after the window was hidden (window "visibilitychange" → visible)
+ *
+ * Strategy:
+ *  - Fetch up to 1 000 exercises, schedules, and 500 recent attempts.
+ *  - For exercises: remote wins when remote.updated_at > local.updated_at.
+ *  - For schedules: remote wins when remote.last_reviewed_at > local.last_reviewed_at.
+ *  - For attempts: insert any remote attempt whose exercise_id+attempted_at pair is absent locally.
+ *  - Always a no-op when Supabase is not configured or userId is not a real UUID.
+ */
+export async function pullTrainingState(
+  userId: string
+): Promise<HydrationResult> {
+  const result: HydrationResult = {
+    exercisesMerged: 0,
+    schedulesMerged: 0,
+    attemptsMerged: 0
+  };
+
+  if (!isSupabaseConfigured || !isRealUuid(userId)) return result;
+
+  // ── 1. Exercises ─────────────────────────────────────────────────────────
+  const rEx = await remote<TrainingExerciseRecord[]>(
+    s =>
+      supabase
+        .from("training_exercises")
+        .select("*")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(1000)
+        .abortSignal(s) as any,
+    { label: "hydration.exercises", timeoutMs: 12000 }
+  );
+
+  if (rEx.ok && Array.isArray(rEx.data)) {
+    const local = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
+    const localMap = new Map<string, TrainingExerciseRecord>(
+      local.map(e => [e.id, e])
+    );
+
+    for (const remote of rEx.data) {
+      const existing = localMap.get(remote.id);
+      const remoteTime = remote.updated_at ?? "0";
+      const localTime = existing?.updated_at ?? "0";
+      if (!existing || remoteTime > localTime) {
+        localMap.set(remote.id, remote);
+        result.exercisesMerged++;
+      }
+    }
+
+    saveLocal(LS_EXERCISES, Array.from(localMap.values()));
+  }
+
+  // ── 2. Review schedules ───────────────────────────────────────────────────
+  const rSched = await remote<ReviewScheduleRecord[]>(
+    s =>
+      supabase
+        .from("review_schedule")
+        .select("*")
+        .eq("user_id", userId)
+        .order("last_reviewed_at", { ascending: false })
+        .limit(1000)
+        .abortSignal(s) as any,
+    { label: "hydration.schedule", timeoutMs: 12000 }
+  );
+
+  if (rSched.ok && Array.isArray(rSched.data)) {
+    const local = getLocal<ReviewScheduleRecord>(LS_SCHEDULE);
+    const localMap = new Map<string, ReviewScheduleRecord>(
+      local.map(s => [s.exercise_id, s])
+    );
+
+    for (const remote of rSched.data) {
+      const existing = localMap.get(remote.exercise_id);
+      const remoteTime = remote.last_reviewed_at ?? remote.updated_at ?? "0";
+      const localTime =
+        existing?.last_reviewed_at ?? existing?.updated_at ?? "0";
+      if (!existing || remoteTime > localTime) {
+        localMap.set(remote.exercise_id, remote);
+        result.schedulesMerged++;
+      }
+    }
+
+    saveLocal(LS_SCHEDULE, Array.from(localMap.values()));
+  }
+
+  // ── 3. Exercise attempts (last 500) ───────────────────────────────────────
+  const rAttempts = await remote<ExerciseAttemptRecord[]>(
+    s =>
+      supabase
+        .from("exercise_attempts")
+        .select("*")
+        .eq("user_id", userId)
+        .order("attempted_at", { ascending: false })
+        .limit(500)
+        .abortSignal(s) as any,
+    { label: "hydration.attempts", timeoutMs: 12000 }
+  );
+
+  if (rAttempts.ok && Array.isArray(rAttempts.data)) {
+    const local = getLocal<ExerciseAttemptRecord>(LS_ATTEMPTS);
+    // Dedup key: exercise_id + attempted_at
+    const localKeys = new Set<string>(
+      local.map(a => `${a.exercise_id}|${a.attempted_at ?? ""}`)
+    );
+
+    const toAdd: ExerciseAttemptRecord[] = [];
+    for (const remote of rAttempts.data) {
+      const key = `${remote.exercise_id}|${remote.attempted_at ?? ""}`;
+      if (!localKeys.has(key)) {
+        toAdd.push(remote);
+        localKeys.add(key);
+        result.attemptsMerged++;
+      }
+    }
+
+    if (toAdd.length > 0) {
+      saveLocal(LS_ATTEMPTS, [...local, ...toAdd]);
+    }
+  }
+
+  return result;
+}
+
+/** localStorage key used to gate once-per-session hydration. */
+const LS_HYDRATION_SESSION_KEY = "chessforge:hydration_session";
+
+/**
+ * Returns true when pullTrainingState should be called (once per browser/Electron
+ * session per userId, or whenever the userId changes).
+ */
+export function isHydrationDue(userId: string): boolean {
+  try {
+    const stored = sessionStorage.getItem(LS_HYDRATION_SESSION_KEY);
+    return stored !== userId;
+  } catch {
+    return true;
+  }
+}
+
+/** Mark hydration as done for this session. */
+export function markHydrationDone(userId: string): void {
+  try {
+    sessionStorage.setItem(LS_HYDRATION_SESSION_KEY, userId);
+  } catch {
+    /* ignore */
+  }
+}
+

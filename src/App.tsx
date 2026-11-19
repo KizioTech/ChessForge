@@ -35,6 +35,9 @@ import logoUrl from "./assets/logo.png";
 import {
   saveGeneratedExercises,
   getTrainingStats,
+  pullTrainingState,
+  isHydrationDue,
+  markHydrationDone,
   type TrainingStats
 } from "./lib/training/training-service";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "./lib/export";
@@ -230,6 +233,42 @@ function App() {
     }, 3000);
     return () => clearTimeout(tid);
   }, [user?.id, handleSyncGames]);
+
+  // ── Item 1.5: Training cloud hydration ───────────────────────────────────
+  // Pull training data from Supabase once per session on login, and whenever
+  // the window regains focus (e.g. user switches devices or reopens the app).
+  const hydrationRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const hydrate = async (userId: string) => {
+      if (!isHydrationDue(userId)) return;
+      markHydrationDone(userId);
+      hydrationRef.current = userId;
+      try {
+        await pullTrainingState(userId);
+        refreshTrainingStats();
+      } catch {
+        // non-fatal — local data already in place
+      }
+    };
+
+    // Run immediately when user id becomes available
+    hydrate(user.id);
+
+    // Re-run whenever the window/tab becomes visible (focus restore)
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && user?.id) {
+        // Reset the session gate so the next focus triggers a fresh pull
+        hydrationRef.current = null;
+        try { sessionStorage.removeItem("chessforge:hydration_session"); } catch {}
+        hydrate(user.id);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [user?.id, refreshTrainingStats]);
 
   function openAnalysisForGame(gameRecord: GameRecord, targetPly?: number) {
     // Clear prior analysis state whenever a new game is loaded
