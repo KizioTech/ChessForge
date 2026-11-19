@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Hardening & Architectural Reliability (PR A through PR E)
+- **PR A — Core Correctness & Metrics**:
+  - Persisted and tracked `consecutive_successes` across SM-2 spaced repetition attempts; exercises advance to `mastered` status after 5 consecutive successful reviews (`src/lib/training/training-service.ts`, `src/lib/training/types.ts`).
+  - Separated heuristic/screening mistakes (`source: "heuristic"`) into dedicated storage (`chessforge:screening-mistakes`), preventing screening data from polluting engine-verified mistake stores or uploading to Supabase (`fast-batch-analyzer.ts`, `training-service.ts`).
+  - Implemented real `blundersPer100Moves` pure metric calculated solely from player's analyzed moves with a minimum 100-move sample floor (`src/lib/insight/metrics.ts`).
+  - Terminal evaluation fix: terminal checkmate/stalemate positions (`mateIn === 0`) are evaluated accurately according to side-to-move without generating false blunders (`game-analyzer.ts`, `win-probability.ts`).
+- **PR B — Reliability, Schema & Remote Handling**:
+  - Cancellation-safe, typed `remote<T>()` Supabase helper racing query promises against a timeout sentinel, passing `AbortSignal` to every remote query (`src/lib/remote.ts`).
+  - Engine serialization queue: `StockfishEngine.evaluatePosition()` calls are strictly serialized so in-flight requests never collide; added dynamic timeouts and proper `isReady()` handshake synchronisation (`src/lib/engine/stockfish-engine.ts`).
+  - UCI parser: filtered out `lowerbound` and `upperbound` tokens from aspiration search lines to avoid recording speculative search bounds as exact scores (`src/lib/engine/uci-parser.ts`).
+  - Atomic RPC `replace_analysis()` for transactional position updates (`supabase/migrations/20261119000008_hardening_pr_b.sql`, `src/lib/analyses.ts`).
+  - Schema hardening: generated 4-part normalized `fen_key` column and unique constraint `uq_exercises_user_fen_key` to eliminate transposition duplicates across games (`exercise-generator.ts`).
+- **PR C — Training Cloud Hydration**:
+  - Implemented `pullTrainingState(userId)`: automatically hydrates exercises, review schedules, and attempts from Supabase on login and window focus restore (`visibilitychange`), preserving newest timestamps (`training-service.ts`, `App.tsx`).
+  - Session gate (`isHydrationDue`/`markHydrationDone`) prevents redundant multi-pulls within a single session.
+- **PR D — IndexedDB Repository Layer & Outbox Sync**:
+  - Added Dexie & `fake-indexeddb` for quota-safe, structured offline storage (`src/lib/db.ts`).
+  - Repository layer (`src/lib/repository.ts`) with lazy one-time migration of legacy localStorage data into IndexedDB on first run.
+  - Dual-write architecture: IndexedDB acts as the primary structured local store with localStorage write-through caching (`games.ts`, `training-service.ts`).
+  - Outbox write queue (`src/lib/outbox.ts`): enqueues failed Supabase writes during offline or network error states, retrying up to 5 times with user-scoped isolation.
+  - Automatic outbox flush on user login and window focus in `App.tsx`.
+- **PR E — Electron Hardening & CI Hygiene**:
+  - Enforced `webSecurity: true`, `allowRunningInsecureContent: false`, and `sandbox: true` in Electron main process (`electron/main.ts`).
+  - Added `will-navigate` window event handler preventing unauthorized redirects and delegating external links to the system browser.
+  - Updated CI workflow (`.github/workflows/ci.yml`) to run `npm run build` validating both Vite frontend and Electron TypeScript.
+
 ### Added
 - **Open-Source Lichess Puzzle Integration in Training Tab (`src/lib/training/lichess-puzzles.ts`, `src/components/PuzzleTrainer.tsx`, `src/components/TrainingDesk.tsx`)**:
   - Integrated open-source, CC0-licensed puzzles from Lichess via daily puzzle and batch API endpoints with local caching (`chessforge:lichess-puzzles`) and 24-hour TTL.
