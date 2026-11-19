@@ -3,9 +3,10 @@ import { Chess, type Square } from "chess.js";
 import {
   Sparkles, ShieldAlert, Award, ArrowRight, RotateCcw, Lightbulb,
   Flag, CheckCircle2, XCircle, ChevronRight, HelpCircle, Trophy,
-  Play, ThumbsUp, Flame, ArrowLeft
+  Play, ThumbsUp, Flame, ArrowLeft, Target, Puzzle
 } from "lucide-react";
 import { BoardView } from "./BoardView";
+import { PuzzleTrainer } from "./PuzzleTrainer";
 import type {
   ExerciseWithSchedule,
   ExerciseGrade,
@@ -30,6 +31,7 @@ export function TrainingDesk({
   onNavigateToQueue,
   userId
 }: TrainingDeskProps) {
+  const [activeTab, setActiveTab] = useState<"exercises" | "puzzles">("exercises");
   const [exercises, setExercises] = useState<ExerciseWithSchedule[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -239,9 +241,25 @@ export function TrainingDesk({
   }
 
   // Session complete view
-  if (sessionCompleted || exercises.length === 0) {
+  if (activeTab === "exercises" && (sessionCompleted || exercises.length === 0)) {
     return (
       <div className="content placeholder-page">
+        {/* Sub-tab Navigation */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "20px", justifyContent: "center" }}>
+          <button
+            className="button button-small button-primary"
+            onClick={() => setActiveTab("exercises")}
+          >
+            <Target size={14} /> My Game Exercises
+          </button>
+          <button
+            className="button button-small button-secondary"
+            onClick={() => setActiveTab("puzzles")}
+          >
+            <Puzzle size={14} /> Lichess Open Puzzles
+          </button>
+        </div>
+
         <div className="placeholder-hero">
           <div className="placeholder-icon" style={{ background: "rgba(183, 227, 106, 0.15)", color: "var(--lime)" }}>
             <Trophy size={32} />
@@ -250,19 +268,43 @@ export function TrainingDesk({
           <h1>{exercises.length === 0 ? "You're all caught up!" : "Training completed."}</h1>
           <p>
             {exercises.length === 0
-              ? "No exercises are due right now. Import more games or review past positions in your library."
+              ? "No game exercises are due right now. Hone your tactical intuition with open-source Lichess puzzles!"
               : `You completed ${sessionScore.total} exercises with ${sessionScore.correct} solved correctly.`}
           </p>
 
           <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-            <button className="button button-primary" onClick={onBackToDashboard}>
-              <ArrowLeft size={14} /> Back to dashboard
+            <button className="button button-primary" onClick={() => setActiveTab("puzzles")}>
+              <Puzzle size={14} /> Train with Open-Source Puzzles
             </button>
             <button className="button button-secondary" onClick={onNavigateToQueue}>
               View review queue <ChevronRight size={14} />
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (activeTab === "puzzles") {
+    return (
+      <div className="content training-content" style={{ maxWidth: "1050px", margin: "0 auto", padding: "20px 24px" }}>
+        {/* Sub-tab Navigation */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+          <button
+            className="button button-small button-secondary"
+            onClick={() => setActiveTab("exercises")}
+          >
+            <Target size={14} /> My Game Exercises
+          </button>
+          <button
+            className="button button-small button-primary"
+            onClick={() => setActiveTab("puzzles")}
+          >
+            <Puzzle size={14} /> Lichess Open Puzzles
+          </button>
+        </div>
+
+        <PuzzleTrainer onBack={() => setActiveTab("exercises")} />
       </div>
     );
   }
@@ -275,6 +317,22 @@ export function TrainingDesk({
 
   return (
     <div className="content training-content" style={{ maxWidth: "1050px", margin: "0 auto", padding: "20px 24px" }}>
+      {/* Sub-tab Navigation */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+        <button
+          className="button button-small button-primary"
+          onClick={() => setActiveTab("exercises")}
+        >
+          <Target size={14} /> My Game Exercises
+        </button>
+        <button
+          className="button button-small button-secondary"
+          onClick={() => setActiveTab("puzzles")}
+        >
+          <Puzzle size={14} /> Lichess Open Puzzles
+        </button>
+      </div>
+
       {/* Top Bar / Progress */}
       <div
         style={{

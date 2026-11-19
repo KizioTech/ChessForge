@@ -22,6 +22,7 @@ import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
 import { AnalyticsView } from "./components/AnalyticsView";
 import { OpeningsHub } from "./components/OpeningsHub";
+import { EndgameLab } from "./components/EndgameLab";
 import { useAuth } from "./lib/auth";
 import { getSettings, applyTheme } from "./lib/settings";
 import { getGames, deleteGame, type GameRecord } from "./lib/games";
@@ -230,7 +231,7 @@ function App() {
     return () => clearTimeout(tid);
   }, [user?.id, handleSyncGames]);
 
-  function openAnalysisForGame(gameRecord: GameRecord) {
+  function openAnalysisForGame(gameRecord: GameRecord, targetPly?: number) {
     // Clear prior analysis state whenever a new game is loaded
     setAnalysisPositions([]);
     setMoveReports([]);
@@ -242,7 +243,10 @@ function App() {
       chess.loadPgn(gameRecord.pgn, { strict: false });
       const sanMoves = chess.history();
       setMoves(sanMoves);
-      setHistoryIndex(sanMoves.length);
+      const targetIndex = (targetPly !== undefined && targetPly >= 0 && targetPly <= sanMoves.length)
+        ? targetPly
+        : sanMoves.length;
+      setHistoryIndex(targetIndex);
       setOrientation(gameRecord.user_colour === "black" ? "black" : "white");
       setActiveGame(gameRecord);
       setPage("Analysis");
@@ -601,7 +605,14 @@ function App() {
             initialFamily={openingsTargetFamily}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && (
+        {page === "Endgames" && (
+          <EndgameLab
+            games={games}
+            onBackToDashboard={() => setPage("Dashboard")}
+            onOpenAnalysis={openAnalysisForGame}
+          />
+        )}
+        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
           <Placeholder page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>
