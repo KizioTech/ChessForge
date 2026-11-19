@@ -5,6 +5,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from "../supabase";
+import { remote } from "../remote";
 import type {
   TrainingExerciseRecord,
   MistakeRecord,
@@ -94,50 +95,57 @@ export async function saveGeneratedExercises(
 
   // 3. Remote Supabase persistence (if authenticated with UUID and not skipped)
   if (!options?.skipRemoteSync && userId && isRealUuid(userId)) {
-    try {
-      const timeoutPromise = new Promise<{ error: Error }>(resolve =>
-        setTimeout(() => resolve({ error: new Error("Training remote sync timeout") }), 2000)
-      );
-
-      if (mistakes.length > 0) {
-        const remoteMistakes = mistakes
-          .filter(m => isRealUuid(m.game_id))
-          .map(m => ({
-            ...m,
-            id: isRealUuid(m.id) ? m.id : undefined,
-            position_id: isRealUuid(m.position_id) ? m.position_id : null,
-            user_id: userId
-          }));
-        if (remoteMistakes.length > 0) {
-          await Promise.race([supabase.from("mistakes").upsert(remoteMistakes), timeoutPromise]);
-        }
-      }
-
-      if (exercises.length > 0) {
-        const remoteExercises = exercises
-          .filter(e => isRealUuid(e.game_id || ""))
-          .map(e => ({
-            ...e,
-            id: isRealUuid(e.id) ? e.id : undefined,
-            mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
-            user_id: userId
-          }));
-        if (remoteExercises.length > 0) {
-          await Promise.race([supabase.from("training_exercises").upsert(remoteExercises), timeoutPromise]);
-        }
-      }
-
-      const remoteSchedules = schedules
-        .filter(s => isRealUuid(s.exercise_id))
-        .map(s => ({
-          ...s,
+    if (mistakes.length > 0) {
+      const remoteMistakes = mistakes
+        .filter(m => isRealUuid(m.game_id))
+        .map(m => ({
+          ...m,
+          id: isRealUuid(m.id) ? m.id : undefined,
+          position_id: isRealUuid(m.position_id) ? m.position_id : null,
           user_id: userId
         }));
-      if (remoteSchedules.length > 0) {
-        await Promise.race([supabase.from("review_schedule").upsert(remoteSchedules), timeoutPromise]);
+      if (remoteMistakes.length > 0) {
+        const r = await remote(
+          s => supabase.from("mistakes").upsert(remoteMistakes).abortSignal(s).select(),
+          { label: "training.mistakes.upsert" }
+        );
+        if (!r.ok) {
+          console.warn("Remote mistakes upsert failed:", r.message);
+        }
       }
-    } catch (err) {
-      console.warn("Supabase training persistence fallback to local storage:", err);
+    }
+
+    if (exercises.length > 0) {
+      const remoteExercises = exercises
+        .filter(e => isRealUuid(e.game_id || ""))
+        .map(e => ({
+          ...e,
+          id: isRealUuid(e.id) ? e.id : undefined,
+          mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
+          user_id: userId
+        }));
+      if (remoteExercises.length > 0) {
+        const r = await remote(
+          s => supabase.from("training_exercises").upsert(remoteExercises).abortSignal(s).select(),
+          { label: "training.exercises.upsert" }
+        );
+        if (!r.ok) {
+          console.warn("Remote exercises upsert failed:", r.message);
+        }
+      }
+    }
+
+    const remoteSchedules = schedules
+      .filter(s => isRealUuid(s.exercise_id))
+      .map(s => ({ ...s, user_id: userId }));
+    if (remoteSchedules.length > 0) {
+      const r = await remote(
+        s => supabase.from("review_schedule").upsert(remoteSchedules).abortSignal(s).select(),
+        { label: "training.schedule.upsert" }
+      );
+      if (!r.ok) {
+        console.warn("Remote schedule upsert failed:", r.message);
+      }
     }
   }
 
@@ -149,38 +157,47 @@ export async function saveGeneratedExercises(
  */
 export async function syncLocalTrainingToSupabase(userId?: string): Promise<void> {
   if (!isSupabaseConfigured || !userId || !isRealUuid(userId)) return;
-  try {
-    const allMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
-    const allExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
 
-    // Only upload real engine-verified mistakes (source === "stockfish")
-    const validMistakes = allMistakes
-      .filter(m => isRealUuid(m.game_id) && m.source !== "heuristic")
-      .map(m => ({
-        ...m,
-        id: isRealUuid(m.id) ? m.id : undefined,
-        position_id: isRealUuid(m.position_id) ? m.position_id : null,
-        user_id: userId
-      }));
+  const allMistakes = getLocal<MistakeRecord>(LS_MISTAKES);
+  const allExercises = getLocal<TrainingExerciseRecord>(LS_EXERCISES);
 
-    if (validMistakes.length > 0) {
-      await supabase.from("mistakes").upsert(validMistakes);
+  // Only upload real engine-verified mistakes (source === "stockfish")
+  const validMistakes = allMistakes
+    .filter(m => isRealUuid(m.game_id) && m.source !== "heuristic")
+    .map(m => ({
+      ...m,
+      id: isRealUuid(m.id) ? m.id : undefined,
+      position_id: isRealUuid(m.position_id) ? m.position_id : null,
+      user_id: userId
+    }));
+
+  if (validMistakes.length > 0) {
+    const r = await remote(
+      s => supabase.from("mistakes").upsert(validMistakes).abortSignal(s).select(),
+      { label: "sync.mistakes.upsert" }
+    );
+    if (!r.ok) {
+      console.warn("Background training sync (mistakes) failed:", r.message);
     }
+  }
 
-    const validExercises = allExercises
-      .filter(e => isRealUuid(e.game_id || ""))
-      .map(e => ({
-        ...e,
-        id: isRealUuid(e.id) ? e.id : undefined,
-        mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
-        user_id: userId
-      }));
+  const validExercises = allExercises
+    .filter(e => isRealUuid(e.game_id || ""))
+    .map(e => ({
+      ...e,
+      id: isRealUuid(e.id) ? e.id : undefined,
+      mistake_id: isRealUuid(e.mistake_id) ? e.mistake_id : null,
+      user_id: userId
+    }));
 
-    if (validExercises.length > 0) {
-      await supabase.from("training_exercises").upsert(validExercises);
+  if (validExercises.length > 0) {
+    const r = await remote(
+      s => supabase.from("training_exercises").upsert(validExercises).abortSignal(s).select(),
+      { label: "sync.exercises.upsert" }
+    );
+    if (!r.ok) {
+      console.warn("Background training sync (exercises) failed:", r.message);
     }
-  } catch (err) {
-    console.warn("Background training sync fallback:", err);
   }
 }
 
@@ -298,15 +315,26 @@ export async function recordAttemptAndAdvanceSchedule(
 
   // Remote update if authenticated
   if (userId && isRealUuid(userId) && isRealUuid(exercise.id)) {
-    try {
-      await supabase.from("review_schedule").upsert(updatedSched);
-      if (sm2Result.isMastered) {
-        await supabase
-          .from("training_exercises")
-          .update({ status: "mastered" })
-          .eq("id", exercise.id);
+    const rSched = await remote(
+      s => supabase.from("review_schedule").upsert(updatedSched).abortSignal(s).select(),
+      { label: "attempt.schedule.upsert" }
+    );
+    if (!rSched.ok) {
+      console.warn("Remote schedule update failed:", rSched.message);
+    }
+
+    if (sm2Result.isMastered) {
+      const rEx = await remote(
+        s => supabase.from("training_exercises").update({ status: "mastered" }).eq("id", exercise.id).abortSignal(s).select(),
+        { label: "attempt.exercise.mastered" }
+      );
+      if (!rEx.ok) {
+        console.warn("Remote exercise mastery update failed:", rEx.message);
       }
-      await supabase.from("exercise_attempts").insert({
+    }
+
+    const rAttempt = await remote(
+      s => supabase.from("exercise_attempts").insert({
         exercise_id: exercise.id,
         user_id: userId,
         correct: attempt.correct,
@@ -314,9 +342,11 @@ export async function recordAttemptAndAdvanceSchedule(
         hints_used: attempt.hintsUsed,
         moves_tried: attempt.movesTried,
         grade: attempt.grade
-      });
-    } catch (err) {
-      console.warn("Supabase schedule update error:", err);
+      }).abortSignal(s).select(),
+      { label: "attempt.insert" }
+    );
+    if (!rAttempt.ok) {
+      console.warn("Remote attempt insert failed:", rAttempt.message);
     }
   }
 
@@ -340,13 +370,12 @@ export async function flagExercise(
   saveLocal(LS_EXERCISES, updated);
 
   if (userId && isRealUuid(userId) && isRealUuid(exerciseId)) {
-    try {
-      await supabase
-        .from("training_exercises")
-        .update({ status: "flagged", flag_reason: reason })
-        .eq("id", exerciseId);
-    } catch (err) {
-      console.warn("Supabase flag exercise error:", err);
+    const r = await remote(
+      s => supabase.from("training_exercises").update({ status: "flagged", flag_reason: reason }).eq("id", exerciseId).abortSignal(s).select(),
+      { label: "flagExercise" }
+    );
+    if (!r.ok) {
+      console.warn("Remote flag exercise failed:", r.message);
     }
   }
 }

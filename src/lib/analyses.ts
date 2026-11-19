@@ -5,6 +5,7 @@
  * for unauthenticated sessions, offline use, or immediate retrieval.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { remote } from "./remote";
 import type {
   GameAnalysisRecord,
   PositionRecord,
@@ -130,70 +131,31 @@ export async function saveAnalysis(
 
   if (!options?.skipRemoteSync && isSupabaseConfigured && isRealUuid(analysisInput.user_id) && isRealUuid(analysisInput.game_id)) {
     try {
-      const engineName = analysisInput.engine_name || "Stockfish";
-      const depth = analysisInput.depth || 16;
-
-      // Timeout race to prevent slow network / timed out connections from freezing the app
-      const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
-        setTimeout(() => resolve({ data: null, error: new Error("Analysis sync network timeout") }), 2000)
+      // Use atomic RPC replace_analysis to eliminate delete-then-insert failures and check race conditions
+      const rpcResult = await remote(
+        signal =>
+          supabase
+            .rpc("replace_analysis", {
+              p_analysis: analysisRecord,
+              p_positions: positionsRecords
+            })
+            .abortSignal(signal),
+        { timeoutMs: 6000, label: "analyses.replace_analysis" }
       );
 
-      // Check if an analysis already exists for this game, engine, and depth
-      const checkPromise = supabase
-        .from("game_analyses")
-        .select("id")
-        .eq("game_id", analysisInput.game_id)
-        .eq("engine_name", engineName)
-        .eq("depth", depth)
-        .maybeSingle();
-
-      const { data: existingAnalysis } = await Promise.race([checkPromise, timeoutPromise]);
-
-      let realAnalysisId: string;
-      let savedAnalysis: GameAnalysisRecord;
-
-      if (existingAnalysis?.id) {
-        realAnalysisId = existingAnalysis.id;
-        // Delete old positions for this analysis before inserting
-        await supabase.from("positions").delete().eq("analysis_id", realAnalysisId);
-
-        // Update existing analysis record without modifying its primary key id
-        const { id: _ignored, ...updateFields } = analysisRecord;
-        const { data: updated, error: uErr } = await supabase
-          .from("game_analyses")
-          .update({ ...updateFields, updated_at: now })
-          .eq("id", realAnalysisId)
-          .select()
-          .single();
-
-        if (uErr) throw uErr;
-        savedAnalysis = updated as GameAnalysisRecord;
-      } else {
-        // Insert new record
-        const { data: inserted, error: iErr } = await supabase
-          .from("game_analyses")
-          .insert(analysisRecord)
-          .select()
-          .single();
-
-        if (iErr) throw iErr;
-        realAnalysisId = inserted.id;
-        savedAnalysis = inserted as GameAnalysisRecord;
+      if (rpcResult.ok && rpcResult.data) {
+        const confirmedId = String(rpcResult.data);
+        const savedAnalysis = { ...analysisRecord, id: confirmedId };
+        const savedPositions = positionsRecords.map(p => ({ ...p, analysis_id: confirmedId }));
+        const confirmedFull: FullGameAnalysis = {
+          analysis: savedAnalysis,
+          positions: savedPositions
+        };
+        saveLocalAnalysis(analysisInput.game_id, confirmedFull);
+        return confirmedFull;
+      } else if (!rpcResult.ok) {
+        console.warn("Remote analysis sync fallback to local:", rpcResult.message);
       }
-
-      // Insert positions with the confirmed analysis ID
-      const toInsert = positionsRecords.map(p => ({
-        ...p,
-        analysis_id: realAnalysisId
-      }));
-
-      const { error: pErr } = await supabase.from("positions").insert(toInsert);
-      if (pErr) throw pErr;
-
-      return {
-        analysis: savedAnalysis,
-        positions: toInsert
-      };
     } catch (err) {
       console.error("Supabase analysis save failed (saved locally):", err);
     }

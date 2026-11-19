@@ -32,6 +32,7 @@ export class StockfishEngine implements Engine {
   private currentMoveSan = "";
   private currentMoveUci = "";
   private config: Required<EngineConfig>;
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(config?: EngineConfig) {
     this.config = {
@@ -75,11 +76,13 @@ export class StockfishEngine implements Engine {
     if (!this.worker) return false;
     const worker = this.worker;
     return new Promise((resolve, reject) => {
+      let timer: any = null;
       const listener = (e: MessageEvent) => {
         if (
           typeof e.data === "string" &&
           (e.data.trim() === "readyok" || e.data.trim() === "uciok")
         ) {
+          if (timer) clearTimeout(timer);
           worker.removeEventListener("message", listener);
           resolve(true);
         }
@@ -87,15 +90,30 @@ export class StockfishEngine implements Engine {
       worker.addEventListener("message", listener);
       this.sendCommand("isready");
 
-      setTimeout(() => {
+      timer = setTimeout(() => {
         worker.removeEventListener("message", listener);
-        // If engine doesn't reply within 3 seconds, reject
         reject(new Error("Stockfish engine isready handshake timed out."));
       }, 3000);
     });
   }
 
-  async evaluatePosition(
+  evaluatePosition(
+    fen: string,
+    options?: {
+      depth?: number;
+      multiPv?: number;
+      signal?: AbortSignal;
+      ply?: number;
+      moveSan?: string;
+      moveUci?: string;
+    }
+  ): Promise<PositionEvaluation> {
+    const job = this.queue.then(() => this.runEvaluation(fen, options));
+    this.queue = job.catch(() => undefined);
+    return job;
+  }
+
+  private async runEvaluation(
     fen: string,
     options?: {
       depth?: number;
@@ -119,20 +137,21 @@ export class StockfishEngine implements Engine {
     const depth = options?.depth ?? this.config.depth;
     const multiPv = options?.multiPv ?? this.config.multiPv;
     const ply = options?.ply ?? 0;
+    const timeoutDuration = Math.max(10000, Math.round(depth * 1500));
 
     return new Promise<PositionEvaluation>((resolve, reject) => {
       let settled = false;
 
-      // 10-second timeout: throws rather than silently faking an evaluation
-      const timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(async () => {
         if (!settled) {
           settled = true;
           this.sendCommand("stop");
+          await this.isReady().catch(() => undefined);
           this.currentResolver = null;
           this.currentRejecter = null;
           reject(new Error(`Stockfish evaluation timed out at ply ${ply} (depth ${depth})`));
         }
-      }, 10000);
+      }, timeoutDuration);
 
       this.currentResolver = (val: PositionEvaluation) => {
         if (!settled) {
@@ -159,11 +178,14 @@ export class StockfishEngine implements Engine {
 
       // Abort signal listener
       if (options?.signal) {
-        const onAbort = () => {
+        const onAbort = async () => {
           if (!settled) {
             settled = true;
             clearTimeout(timeoutId);
             this.sendCommand("stop");
+            await this.isReady().catch(() => undefined);
+            this.currentResolver = null;
+            this.currentRejecter = null;
             reject(new DOMException("Evaluation aborted", "AbortError"));
           }
         };

@@ -24,6 +24,15 @@ import type {
 import { getMoverWinProbability, calculateWinProbability } from "../engine/win-probability";
 import { tagMistake } from "../insight/mistake-tagger";
 
+/**
+ * Normalize a FEN to its 4-part position key (piece placement + active colour +
+ * castling rights + en passant), stripping the halfmove clock and fullmove number.
+ * Two positions reached by different move orders but otherwise identical compare equal.
+ */
+export function normalizeFenKey(fen: string): string {
+  return fen.split(" ").slice(0, 4).join(" ");
+}
+
 export interface ExerciseGenerationInput {
   game: GameRecord;
   positions: PositionRecord[];
@@ -159,8 +168,8 @@ export function generateExercisesFromGame({
     const moverProbBefore = report.evalBefore;
     if (moverProbBefore < 10 || moverProbBefore > 90) continue;
 
-    // Rule 6: Position (by FEN) not already an existing exercise
-    if (existingFens.has(posBefore.fen)) continue;
+    // Rule 6: Position (by normalized 4-part FEN key) not already an existing exercise
+    if (existingFens.has(normalizeFenKey(posBefore.fen))) continue;
 
     // Rule 4: Clear task exists
     const pvLines = (posBefore.pv_lines || []) as CandidateLine[];

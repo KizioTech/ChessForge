@@ -30,6 +30,11 @@ export function parseUciInfoLine(line: string, sideToMove: "w" | "b"): ParsedUci
 
   const tokens = line.trim().split(/\s+/);
 
+  // Ignore lowerbound / upperbound aspiration search info lines (not exact scores)
+  if (tokens.includes("lowerbound") || tokens.includes("upperbound")) {
+    return null;
+  }
+
   // Depth
   const depthIdx = tokens.indexOf("depth");
   const depth = depthIdx !== -1 ? parseInt(tokens[depthIdx + 1], 10) : 0;
