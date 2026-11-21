@@ -18,6 +18,7 @@ import {
   Database
 } from "lucide-react";
 import { BoardView } from "./BoardView";
+import { CalculationTrainer } from "./CalculationTrainer";
 import type { GameRecord } from "../lib/games";
 import {
   ENDGAME_CURRICULUM,
@@ -65,6 +66,7 @@ const DIFFICULTY_COLORS: Record<EndgameDifficulty, string> = {
 
 export function EndgameLab({ games = [], onBackToDashboard, onOpenAnalysis }: EndgameLabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mainTab, setMainTab] = useState<"curriculum" | "calculation">("curriculum");
   const [categoryFilter, setCategoryFilter] = useState<EndgameCategory | "all">("all");
   const [difficultyFilter, setDifficultyFilter] = useState<EndgameDifficulty | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,23 +128,57 @@ export function EndgameLab({ games = [], onBackToDashboard, onOpenAnalysis }: En
           }}
         />
       ) : (
-        <CurriculumBrowser
-          positions={filteredPositions}
-          minedPositions={minedPositions}
-          progress={progress}
-          totalCount={totalCount}
-          masteredCount={masteredCount}
-          inProgressCount={inProgressCount}
-          categoryFilter={categoryFilter}
-          setCategoryFilter={setCategoryFilter}
-          difficultyFilter={difficultyFilter}
-          setDifficultyFilter={setDifficultyFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onSelectPosition={id => setSelectedId(id)}
-          onOpenAnalysis={onOpenAnalysis}
-          games={games}
-        />
+        <>
+          {/* Main Sub-nav Tabs */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginBottom: "1.5rem",
+              borderBottom: "1px solid var(--line)",
+              paddingBottom: "12px"
+            }}
+          >
+            <button
+              className={`button ${mainTab === "curriculum" ? "button-primary" : "button-secondary"}`}
+              onClick={() => setMainTab("curriculum")}
+              style={{ fontSize: "12px" }}
+            >
+              <Crown size={14} />
+              Endgame Curriculum & Drills
+            </button>
+            <button
+              className={`button ${mainTab === "calculation" ? "button-primary" : "button-secondary"}`}
+              onClick={() => setMainTab("calculation")}
+              style={{ fontSize: "12px" }}
+            >
+              <Sparkles size={14} />
+              Calculation & Blindfold Lab
+            </button>
+          </div>
+
+          {mainTab === "curriculum" ? (
+            <CurriculumBrowser
+              positions={filteredPositions}
+              minedPositions={minedPositions}
+              progress={progress}
+              totalCount={totalCount}
+              masteredCount={masteredCount}
+              inProgressCount={inProgressCount}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              difficultyFilter={difficultyFilter}
+              setDifficultyFilter={setDifficultyFilter}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onSelectPosition={id => setSelectedId(id)}
+              onOpenAnalysis={onOpenAnalysis}
+              games={games}
+            />
+          ) : (
+            <CalculationTrainer />
+          )}
+        </>
       )}
     </div>
   );

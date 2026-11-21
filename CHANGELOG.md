@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated CI workflow (`.github/workflows/ci.yml`) to run `npm run build` validating both Vite frontend and Electron TypeScript.
 
 ### Added
+- **Calculation & Blindfold Memory Lab (`src/lib/endgames/calculation-trainer.ts`, `src/lib/endgames/calculation-data.ts`, `src/components/CalculationTrainer.tsx`)**:
+  - Implemented mental calculation step-ahead drills with 16 curated classic endgame and tactical studies (Réti diagonal march, Lucena bridge building, triangulation, opposition, lateral cutoffs, 3-vs-3 pawn breakthroughs).
+  - Unseen intermediate moves prompt players to calculate positions entirely in their mind's eye without moving physical pieces.
+  - Instant move verification and grading against primary solutions and alternative winning branches with full pedagogical explanations.
+  - Interactive "Hold to Peek" target position preview and local attempt/mastery persistence.
+  - Blindfold piece visualizer integrated into `BoardView.tsx` with `"normal"`, `"ghost"` (translucent silhouette), and `"blind"` (fully invisible pieces) rendering modes.
+  - 30-Second Rapid Board Coordinate Sight Reflex challenge tracking score, streaks, and local personal bests.
+  - Free Blindfold Playground allowing open-ended position exploration with invisible pieces and move history logging.
+  - Top navigation pill switcher in `EndgameLab.tsx` between Endgame Curriculum & Drills and the Calculation & Blindfold Lab.
 - **Syzygy 7-Piece Endgame Tablebase Integration (`src/lib/endgames/tablebase.ts`, `src/components/EndgameLab.tsx`)**:
   - Integrated public CC0 7-piece tablebase API via Lichess (`https://tablebase.lichess.ovh/standard`).
   - Automatically probes theoretical outcomes (Win, Draw, Loss, Cursed Win, Blessed Loss) with exact distance-to-mate (DTM) and distance-to-zeroing (DTZ) for any endgame position with $\le 7$ pieces.

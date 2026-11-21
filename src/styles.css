@@ -164,6 +164,18 @@ cg-board square.check {
   color: #b0bfc2;
 }
 
+/* Blindfold / Calculation Memory trainer piece modes */
+.blindfold-ghost .cg-wrap piece {
+  opacity: 0.16 !important;
+  filter: grayscale(1) !important;
+  transition: opacity 0.25s ease;
+}
+
+.blindfold-blind .cg-wrap piece {
+  display: none !important;
+}
+
+
 @keyframes banner-slide-up {
   from {
     opacity: 0;

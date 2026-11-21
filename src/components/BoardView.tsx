@@ -17,6 +17,8 @@ interface BoardViewProps {
   lastMove?: [string, string] | null;
   /** Arrows drawn on the board (for example a hint or the engine's best move). */
   shapes?: { orig: string; dest: string; brush: string }[];
+  /** Blindfold training mode: normal (visible), ghost (translucent pieces), blind (completely invisible) */
+  blindfoldMode?: "normal" | "ghost" | "blind";
 }
 
 function toDests(chess: Chess): Map<Key, Key[]> {
@@ -38,7 +40,8 @@ export function BoardView({
   interactive = true,
   maxWidth = "100%",
   lastMove = null,
-  shapes = []
+  shapes = [],
+  blindfoldMode = "normal"
 }: BoardViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cgRef = useRef<Api | null>(null);
@@ -159,7 +162,7 @@ export function BoardView({
 
   return (
     <div
-      className="board-container"
+      className={`board-container ${blindfoldMode !== "normal" ? `blindfold-${blindfoldMode}` : ""}`}
       style={{
         position: "relative",
         height: "100%",

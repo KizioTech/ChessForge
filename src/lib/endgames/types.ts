@@ -45,3 +45,46 @@ export interface EndgameProgress {
 }
 
 export type EndgameProgressMap = Record<string, EndgameProgress>;
+
+/* -------------------------------------------------------------------------- */
+/* Calculation & Blindfold Drills                                             */
+/* -------------------------------------------------------------------------- */
+
+export type CalculationCategory =
+  | "pawn-race"
+  | "rook-cutoff"
+  | "triangulation"
+  | "tactical-skewer"
+  | "breakthrough"
+  | "deflection"
+  | "mate-net";
+
+export interface CalculationDrill {
+  id: string;
+  title: string;
+  category: CalculationCategory;
+  difficulty: EndgameDifficulty;
+  initialFen: string;
+  sideToMove: "white" | "black";
+  /** Sequence of unseen moves the user must visualize without moving pieces on the board */
+  unseenMoves: string[];
+  /** Pedagogical instruction prompt */
+  prompt: string;
+  /** Primary expected winning or drawing solution move (SAN) from the resulting mental position */
+  solutionMove: string;
+  /** Acceptable alternative winning moves (SAN) */
+  alternativeSolutions?: string[];
+  explanation: string;
+  tacticalTheme: string;
+}
+
+export interface CalculationAttemptResult {
+  correct: boolean;
+  playedMove: string;
+  expectedMove: string;
+  explanation: string;
+  targetFen: string;
+}
+
+export type BlindfoldPieceMode = "normal" | "ghost" | "blind";
+

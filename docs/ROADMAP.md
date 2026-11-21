@@ -169,7 +169,7 @@ Before closing any phase, every item below must be satisfied:
 ---
 
 ### Phase 8: Endgame Lab & Calculation (R4)
-- **Status:** In Progress
+- **Status:** ✅ Complete (Signed off — delivered in full)
 - **Release Target:** `v0.8.0`
 - **Scope:** Technical endgame practice, tablebase integration, calculation trainer.
 - **Deliverables:**
@@ -177,7 +177,7 @@ Before closing any phase, every item below must be satisfied:
   - [x] Interactive Endgame Lab UI (`EndgameLab.tsx`) with category filtering, difficulty selection, and search.
   - [x] Real-time drill room with opponent auto-responses, hints, rule cards, and mastery progression.
   - [x] Online tablebase probe integration (Syzygy/Lichess 7-piece tablebase API).
-  - [ ] Blindfold/Calculation memory drill mode.
+  - [x] Blindfold/Calculation memory drill mode.
 
 ---
 
@@ -214,7 +214,7 @@ Before closing any phase, every item below must be satisfied:
 | **Phase 5** | Insight & Weakness Diagnosis | ✅ **Complete** | Signed off — `v0.5.0` |
 | **Phase 6** | Platform Integrations | ✅ **Complete** | Signed off — `v0.6.0` |
 | **Phase 7** | Opening Repertoires | ✅ **Complete** | Signed off — `v0.7.0` |
-| **Phase 8** | Endgame Lab & Calculation | **In Progress** | Technical curriculum & drills shipped; tablebase integration next |
+| **Phase 8** | Endgame Lab & Calculation | ✅ **Complete** | Signed off — curriculum, tablebases & calculation trainer |
 | **Phase 9** | Desktop Packaging | ✅ **Complete** | Shipped early — `v0.4.0` public installer |
 | **Phase 10** | Multi-User & Public Readiness | **Locked** | Post-v2.0.0 |
 
