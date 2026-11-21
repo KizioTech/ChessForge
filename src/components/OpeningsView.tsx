@@ -28,6 +28,10 @@ import {
   BookOpenCheck
 } from "lucide-react";
 import { BoardView } from "./BoardView";
+import { WinBar, WinBarLabels } from "./openings/WinBar";
+import { OpeningsDrillTab } from "./openings/OpeningsDrillTab";
+import { OpeningsDeviationsTab } from "./openings/OpeningsDeviationsTab";
+import { OpeningsDirectoryTab } from "./openings/OpeningsDirectoryTab";
 import { useExplorer } from "../lib/openings/use-explorer";
 import type { GameRecord } from "../lib/games";
 import {
@@ -81,38 +85,6 @@ interface OpeningsViewProps {
 }
 
 // ── Lichess Opening Explorer hook ────────────────────────────────────────────
-
-// ── Win percentage bar components ─────────────────────────────────────────────
-
-function WinBar({ white, draws, black }: { white: number; draws: number; black: number }) {
-  const total = white + draws + black;
-  if (total === 0) return null;
-  const wp = Math.round((white / total) * 100);
-  const dp = Math.round((draws / total) * 100);
-  const bp = 100 - wp - dp;
-  return (
-    <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", width: "100%", minWidth: "80px" }}>
-      <div style={{ width: `${wp}%`, background: "#e8e8e8", transition: "width 0.3s" }} title={`White: ${wp}%`} />
-      <div style={{ width: `${dp}%`, background: "#888", transition: "width 0.3s" }} title={`Draw: ${dp}%`} />
-      <div style={{ width: `${bp}%`, background: "#222", transition: "width 0.3s" }} title={`Black: ${bp}%`} />
-    </div>
-  );
-}
-
-function WinBarLabels({ white, draws, black }: { white: number; draws: number; black: number }) {
-  const total = white + draws + black;
-  if (total === 0) return null;
-  const wp = Math.round((white / total) * 100);
-  const dp = Math.round((draws / total) * 100);
-  const bp = 100 - wp - dp;
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--muted)", marginTop: "2px" }}>
-      <span style={{ color: "#ccc" }}>{wp}%</span>
-      <span>{dp}%</span>
-      <span style={{ color: "var(--muted)" }}>{bp}%</span>
-    </div>
-  );
-}
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
@@ -1185,407 +1157,45 @@ export function OpeningsView({ userId, games, onOpenAnalysis, onBrowseOpenings }
 
       {/* ── Mode 2: Interactive Practice & Drill ────────────────────────── */}
       {activeTab === "drill" && (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(340px, 480px) 1fr", gap: "24px" }}>
-          <div>
-            <div className="panel" style={{ padding: "16px" }}>
-              <BoardView
-                game={drillChess}
-                orientation={activeSide}
-                onMove={handleDrillMove}
-                interactive={!drillSession.completed}
-              />
-              {/* Show current opening name on drill board */}
-              {drillEco && (
-                <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{
-                    background: "rgba(183,227,106,0.18)",
-                    color: "var(--lime)",
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    fontWeight: 700,
-                    fontSize: "10px",
-                    fontFamily: "monospace",
-                  }}>
-                    {drillEco.eco}
-                  </span>
-                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>{drillEco.name}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="panel" style={{ padding: "18px" }}>
-              <div className="eyebrow">ACTIVE RECALL PRACTICE</div>
-              <h2 style={{ fontSize: "16px", margin: "4px 0 10px" }}>
-                Drill {activeSide === "white" ? "White" : "Black"} Repertoire
-              </h2>
-              <p style={{ fontSize: "12px", color: "var(--muted)", margin: "0 0 16px" }}>
-                Play your prepared repertoire moves on the board. ChessForge responds automatically with candidate opponent moves.
-              </p>
-
-              {/* Status Banner */}
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  marginBottom: "16px",
-                  fontSize: "13px",
-                  background:
-                    drillEval.status === "correct"
-                      ? "rgba(183,227,106,0.12)"
-                      : drillEval.status === "incorrect"
-                      ? "rgba(248,113,113,0.12)"
-                      : "var(--raised)",
-                  color:
-                    drillEval.status === "correct"
-                      ? "var(--lime)"
-                      : drillEval.status === "incorrect"
-                      ? "#f87171"
-                      : "var(--fg)",
-                  border: `1px solid ${
-                    drillEval.status === "correct"
-                      ? "var(--lime)"
-                      : drillEval.status === "incorrect"
-                      ? "#f87171"
-                      : "var(--border)"
-                  }`,
-                }}
-              >
-                {drillEval.message || "Ready to drill."}
-              </div>
-
-              {/* Hint Box if requested */}
-              {drillHint && (
-                <div style={{ padding: "10px 14px", background: "rgba(183,227,106,0.1)", border: "1px dashed var(--lime)", borderRadius: "6px", marginBottom: "14px", fontSize: "12px", color: "var(--lime)" }}>
-                  💡 {drillHint}
-                </div>
-              )}
-
-              {/* Drill Score Card */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-                <div className="panel" style={{ padding: "12px", textAlign: "center", background: "var(--sunken)" }}>
-                  <div className="eyebrow">MOVES TESTED</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700 }}>{drillSession.total}</div>
-                </div>
-                <div className="panel" style={{ padding: "12px", textAlign: "center", background: "var(--sunken)" }}>
-                  <div className="eyebrow">ACCURACY</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--lime)" }}>
-                    {drillSession.total > 0 ? `${Math.round((drillSession.correct / drillSession.total) * 100)}%` : "—"}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button className="button button-primary" onClick={handleStartDrill} style={{ flex: 1 }}>
-                  <RotateCcw size={14}/> Restart Drill
-                </button>
-                {!drillSession.completed && (
-                  <button className="button button-secondary" onClick={handleShowDrillHint} title="Show hint for expected repertoire move">
-                    💡 Hint
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Practice Move Suggestions & Win Percentages */}
-            {drillExplorer.data && drillExplorer.data.moves && drillExplorer.data.moves.length > 0 && (
-              <div className="panel" style={{ padding: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>COMMON MOVES &amp; WIN RATES</span>
-                    <span style={{ fontSize: "10px", color: "var(--muted)", textTransform: "none" }}>(Position Context)</span>
-                  </div>
-                  {drillExplorer.loading && (
-                    <Activity size={12} style={{ color: "var(--muted)", animation: "spin 1s linear infinite" }} />
-                  )}
-                </div>
-                <p style={{ fontSize: "11px", color: "var(--muted)", margin: "0 0 10px" }}>
-                  Most common continuations played from this position across online games:
-                </p>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {drillExplorer.data.moves.slice(0, 4).map((m, idx) => {
-                    const total = m.white + m.draws + m.black;
-                    return (
-                      <div key={idx} style={{ padding: "8px 12px", background: "var(--sunken)", borderRadius: "6px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <strong style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--lime)" }}>{m.san}</strong>
-                          <span style={{ fontSize: "10px", color: "var(--muted)" }}>
-                            {(total / 1000).toFixed(total >= 1000000 ? 0 : 1)}k games
-                          </span>
-                        </div>
-                        <WinBar white={m.white} draws={m.draws} black={m.black} />
-                        <WinBarLabels white={m.white} draws={m.draws} black={m.black} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <OpeningsDrillTab
+          drillChess={drillChess}
+          activeSide={activeSide}
+          handleDrillMove={handleDrillMove}
+          drillSession={drillSession}
+          drillEco={drillEco}
+          drillEval={drillEval}
+          drillHint={drillHint}
+          handleStartDrill={handleStartDrill}
+          handleShowDrillHint={handleShowDrillHint}
+          drillExplorer={drillExplorer}
+        />
       )}
 
       {/* ── Mode 3: Game Deviations Report ──────────────────────────────── */}
       {activeTab === "deviations" && (
-        <div className="panel" style={{ padding: "20px" }}>
-          <div style={{ marginBottom: "16px" }}>
-            <div className="eyebrow">REPERTOIRE DEVIATION ALERTS</div>
-            <h2 style={{ fontSize: "16px", margin: "4px 0" }}>Games Leaving Your Preparation</h2>
-            <p style={{ fontSize: "12px", color: "var(--muted)", margin: 0 }}>
-              Scans your library games played on Chess.com and Lichess to identify the exact move where you departed from your opening repertoire.
-            </p>
-          </div>
-
-          {deviations.length === 0 ? (
-            <div style={{ padding: "30px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-              ✓ No opening deviations detected in your recorded games! You played according to your repertoire in all book positions.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {deviations.map((dev, idx) => {
-                const gameMatch = games.find(g => g.id === dev.gameId);
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "var(--raised)",
-                      borderRadius: "8px",
-                      border: "1px solid var(--border)",
-                      fontSize: "12px",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "4px" }}>
-                        {dev.gameWhite} vs {dev.gameBlack} ({dev.userColour === "white" ? "Played as White" : "Played as Black"})
-                      </div>
-                      <div style={{ color: "var(--muted)", fontSize: "11px" }}>
-                        Deviated on move <strong>{dev.moveNumber}</strong> (ply {dev.ply}): played{" "}
-                        <span style={{ color: "#f87171", fontWeight: 600 }}>{dev.playedSan}</span> instead of planned{" "}
-                        <span style={{ color: "var(--lime)", fontWeight: 600 }}>{dev.expectedSan}</span>.
-                      </div>
-                    </div>
-                    {gameMatch && onOpenAnalysis && (
-                      <button
-                        className="button button-secondary button-small"
-                        onClick={() => onOpenAnalysis(gameMatch)}
-                      >
-                        Inspect in Analysis <ArrowRight size={12}/>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <OpeningsDeviationsTab
+          deviations={deviations}
+          games={games}
+          onOpenAnalysis={onOpenAnalysis}
+        />
       )}
 
       {/* ── Mode 4: Openings Directory / Encyclopedia ─────────────────── */}
       {activeTab === "list" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {/* Header & Category Filter Bar */}
-          <div className="panel" style={{ padding: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
-              <div>
-                <h3 style={{ margin: "0 0 4px", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <BookOpenCheck size={18} style={{ color: "var(--lime)" }}/> ECO Openings Directory
-                </h3>
-                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                  Browse, preview, and build repertoires from over 16,000 canonical openings and variations.
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                {/* Search Box */}
-                <div style={{ position: "relative" }}>
-                  <input
-                    className="input"
-                    type="text"
-                    value={listSearch}
-                    onChange={e => { setListSearch(e.target.value); setListPage(0); }}
-                    placeholder="Search name, ECO, moves…"
-                    style={{ fontSize: "12px", paddingLeft: "28px", width: "220px", height: "32px" }}
-                  />
-                  <Search size={13} style={{ position: "absolute", left: "9px", top: "10px", color: "var(--muted)" }}/>
-                  {listSearch && (
-                    <button
-                      onClick={() => { setListSearch(""); setListPage(0); }}
-                      style={{ position: "absolute", right: "8px", top: "7px", background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: "12px" }}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {/* Roots vs All Toggle */}
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", userSelect: "none" }}>
-                  <input
-                    type="checkbox"
-                    checked={listRootsOnly}
-                    onChange={e => { setListRootsOnly(e.target.checked); setListPage(0); }}
-                  />
-                  <span>Root openings only</span>
-                </label>
-              </div>
-            </div>
-
-            {/* ECO Category Filter Tabs */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              <button
-                className={`button button-small ${listCategory === "all" ? "button-primary" : "button-ghost"}`}
-                onClick={() => { setListCategory("all"); setListPage(0); }}
-                style={{ fontSize: "11px" }}
-              >
-                All Volumes
-              </button>
-              {ECO_CATEGORIES.map(cat => (
-                <button
-                  key={cat.code}
-                  className={`button button-small ${listCategory === cat.code ? "button-primary" : "button-ghost"}`}
-                  onClick={() => { setListCategory(cat.code); setListPage(0); }}
-                  title={`${cat.description} (e.g. ${cat.examples})`}
-                  style={{ fontSize: "11px" }}
-                >
-                  <strong>{cat.code}:</strong> {cat.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Openings Grid / Card List */}
-          <div className="panel" style={{ padding: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-              <div className="eyebrow">
-                {listLoading
-                  ? "LOADING OPENINGS…"
-                  : `FOUND ${openingsList.total.toLocaleString()} OPENING${openingsList.total === 1 ? "" : "S"}`}
-              </div>
-              <span style={{ fontSize: "11px", color: "var(--muted)" }}>
-                Showing page {listPage + 1} of {Math.max(1, Math.ceil(openingsList.total / 24))}
-              </span>
-            </div>
-
-            {listLoading ? (
-              <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-                <Activity size={20} className="spin" style={{ display: "inline-block", marginRight: "8px", verticalAlign: "middle" }}/>
-                Loading openings from offline book…
-              </div>
-            ) : openingsList.items.length === 0 ? (
-              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-                No openings found matching your criteria. Try adjusting the search term or category filter.
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
-                {openingsList.items.map((op, idx) => (
-                  <div
-                    key={`${op.eco}-${idx}`}
-                    style={{
-                      background: "var(--raised)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "8px",
-                      padding: "12px 14px",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: "10px"
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span
-                            style={{
-                              background: "rgba(183,227,106,0.18)",
-                              color: "var(--lime)",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              fontWeight: 700,
-                              fontSize: "11px",
-                              fontFamily: "monospace",
-                              border: "1px solid rgba(183,227,106,0.3)"
-                            }}
-                          >
-                            {op.eco}
-                          </span>
-                          {op.isEcoRoot && (
-                            <span style={{ fontSize: "10px", background: "var(--sunken)", color: "var(--muted)", padding: "1px 5px", borderRadius: "3px" }}>
-                              Root
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: "10px", color: "var(--muted)" }}>
-                          Vol. {op.eco.charAt(0)}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "4px", lineHeight: "1.3" }}>
-                        {op.name}
-                      </div>
-                      <div style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--muted)", wordBreak: "break-word" }}>
-                        {op.moves}
-                      </div>
-                    </div>
-
-                    {/* Card Actions */}
-                    <div style={{ display: "flex", gap: "6px", borderTop: "1px solid var(--border)", paddingTop: "8px", justifyContent: "flex-end" }}>
-                      <button
-                        className="button button-ghost button-small"
-                        onClick={() => handlePreviewOpening(op.moves)}
-                        title="Preview move sequence on the interactive explorer board"
-                        style={{ fontSize: "11px", padding: "4px 8px" }}
-                      >
-                        <Eye size={12}/> Preview
-                      </button>
-                      <button
-                        className="button button-secondary button-small"
-                        onClick={() => handleAddFromList(op.moves, op.name, "white")}
-                        title="Add this opening to your White Repertoire"
-                        style={{ fontSize: "11px", padding: "4px 8px" }}
-                      >
-                        <Plus size={12}/> White
-                      </button>
-                      <button
-                        className="button button-secondary button-small"
-                        onClick={() => handleAddFromList(op.moves, op.name, "black")}
-                        title="Add this opening to your Black Repertoire"
-                        style={{ fontSize: "11px", padding: "4px 8px" }}
-                      >
-                        <Plus size={12}/> Black
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Pagination Controls */}
-            {!listLoading && openingsList.total > 24 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--border)" }}>
-                <button
-                  className="button button-secondary button-small"
-                  disabled={listPage === 0}
-                  onClick={() => setListPage(p => Math.max(0, p - 1))}
-                >
-                  ← Previous Page
-                </button>
-                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                  Page {listPage + 1} of {Math.max(1, Math.ceil(openingsList.total / 24))} ({openingsList.total.toLocaleString()} total)
-                </span>
-                <button
-                  className="button button-secondary button-small"
-                  disabled={(listPage + 1) * 24 >= openingsList.total}
-                  onClick={() => setListPage(p => p + 1)}
-                >
-                  Next Page →
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <OpeningsDirectoryTab
+          listSearch={listSearch}
+          setListSearch={setListSearch}
+          listCategory={listCategory}
+          setListCategory={setListCategory}
+          listRootsOnly={listRootsOnly}
+          setListRootsOnly={setListRootsOnly}
+          listPage={listPage}
+          setListPage={setListPage}
+          listLoading={listLoading}
+          openingsList={openingsList}
+          onPreviewOpening={handlePreviewOpening}
+          onAddFromList={handleAddFromList}
+        />
       )}
 
       {/* ── Modal: Search Canonical Openings ─────────────────────────────── */}

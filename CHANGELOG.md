@@ -36,6 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `will-navigate` window event handler preventing unauthorized redirects and delegating external links to the system browser.
   - Updated CI workflow (`.github/workflows/ci.yml`) to run `npm run build` validating both Vite frontend and Electron TypeScript.
 
+### Refactored
+- **Audit Item 13 — Decompose Monolithic Views (`App.tsx`, `OpeningsView.tsx`)**:
+  - Extracted `DashboardView.tsx` from `App.tsx` containing the primary metrics grid, weakness diagnosis panel, recent activity feed, and next-action recommendation.
+  - Extracted `AnalysisView.tsx` from `App.tsx` containing the live Stockfish 19 engine workspace, evaluation rail (`EvaluationRail`), notation panel, candidate moves, and move classification badges.
+  - Extracted `PlaceholderView.tsx` from `App.tsx` for empty/navigational views.
+  - Removed dead legacy `ChessBoard` and `ChessKnight` components from `App.tsx`, reducing `App.tsx` from 1,350 lines down to 605 lines.
+  - Decomposed `OpeningsView.tsx` into modular sub-views under `src/components/openings/`:
+    - `WinBar.tsx`: shared win/draw/loss statistical bars and percentage labels.
+    - `OpeningsDrillTab.tsx`: practice drill room, interactive evaluation banners, hints, and Lichess explorer continuations.
+    - `OpeningsDeviationsTab.tsx`: repertoire departure detector and game inspection links.
+    - `OpeningsDirectoryTab.tsx`: 16,000+ canonical ECO openings directory with category volume filters, search, and pagination.
+    - Reduced `OpeningsView.tsx` from 1,696 lines down to 1,304 lines.
+
 ### Added
 - **Calculation & Blindfold Memory Lab (`src/lib/endgames/calculation-trainer.ts`, `src/lib/endgames/calculation-data.ts`, `src/components/CalculationTrainer.tsx`)**:
   - Implemented mental calculation step-ahead drills with 16 curated classic endgame and tactical studies (Réti diagonal march, Lucena bridge building, triangulation, opposition, lateral cutoffs, 3-vs-3 pawn breakthroughs).
