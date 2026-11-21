@@ -21,6 +21,7 @@ import {
   applyTheme,
   type AppSettings
 } from "../lib/settings";
+import pkg from "../../package.json";
 import logoUrl from "../assets/logo.png";
 import { exportGamesToPgn, exportAllDataAsJson, triggerDownload } from "../lib/export";
 import type { GameRecord } from "../lib/games";
@@ -534,7 +535,7 @@ export function SettingsView({ games, userId, username, onRefreshData, onGamesIm
                       borderRadius: "10px",
                       fontWeight: 600
                     }}>
-                      v0.6.0
+                    v{pkg.version}
                     </span>
                   </div>
                   <span style={{ fontSize: "12px", color: "var(--muted)" }}>
@@ -546,7 +547,7 @@ export function SettingsView({ games, userId, username, onRefreshData, onGamesIm
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px", borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
                   <span style={{ color: "var(--muted)" }}>Author & Development</span>
-                  <strong style={{ color: "var(--text)" }}>KizioTech</strong>
+                  <strong style={{ color: "var(--text)" }}>Josophat Makawa - KizioTech</strong>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
