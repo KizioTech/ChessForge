@@ -63,12 +63,47 @@ export function DashboardView({
   userId
 }: DashboardViewProps) {
   const recentGames = games.slice(0, 3);
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Good morning." : now.getHours() < 18 ? "Good afternoon." : "Good evening.";
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   const [weakness, setWeakness] = useState<WeaknessAnalysisReport | null>(null);
 
   useEffect(() => {
     const totalMoves = games.reduce((sum, g) => sum + (g.moves_count || 0), 0);
     getWeaknessAnalysis(userId, games.length, totalMoves).then(setWeakness);
   }, [userId, games.length]);
+
+  const primaryFocus = weakness?.tagFrequencies.find(item => item.count > 0);
+  const recommendationTitle = trainingStats.dueCount > 0
+    ? "Clear your due review positions"
+    : primaryFocus && trainingStats.totalActive > 0
+    ? `Practise ${primaryFocus.tag.replace(/_/g, " ")}`
+    : recentGames.length > 0
+    ? "Review your latest game"
+    : "Build your personal training plan";
+  const recommendationDescription = trainingStats.dueCount > 0
+    ? `${trainingStats.dueCount} positions are ready for spaced repetition. Reviewing them first keeps your learning plan current.`
+    : primaryFocus && trainingStats.totalActive > 0
+    ? `Your analysed games flagged ${primaryFocus.count} ${primaryFocus.tag.replace(/_/g, " ")} pattern${primaryFocus.count === 1 ? "" : "s"}. Work through the related positions to strengthen this area.`
+    : recentGames.length > 0
+    ? "Open your latest imported game to review its turning points and identify a useful next practice session."
+    : "Import and analyse your own games to get recommendations grounded in your mistakes, not a generic sample plan.";
+  const recommendationAction = trainingStats.dueCount > 0
+    ? "Review Queue"
+    : primaryFocus && trainingStats.totalActive > 0
+    ? "Train"
+    : recentGames.length > 0
+    ? "Analysis"
+    : "Import";
+  const startRecommendedAction = () => {
+    if (recommendationAction === "Review Queue" || recommendationAction === "Train") {
+      onNavigate(recommendationAction);
+    } else if (recentGames.length > 0) {
+      onOpenAnalysis(recentGames[0]);
+    } else {
+      onImport();
+    }
+  };
 
   return (
     <div className="content dashboard-content">
@@ -77,13 +112,13 @@ export function DashboardView({
           <div className="eyebrow">
             <Sparkles size={13} /> YOUR TRAINING DESK
           </div>
-          <h1>Good afternoon.</h1>
+          <h1>{greeting}</h1>
           <p className="subheading">
             A clearer picture of your chess. One decision at a time.
           </p>
         </div>
         <div className="date-chip">
-          <CalendarClock size={14} /> Tuesday, 3 November 2026
+          <CalendarClock size={14} /> {dateLabel}
         </div>
       </div>
 
@@ -180,13 +215,10 @@ export function DashboardView({
             </div>
             <div className="feature-copy">
               <div className="feature-kicker">
-                TACTICAL CALCULATION <span>·</span> 15 MIN
+                TODAY’S PLAN <span>·</span> {trainingStats.dueCount > 0 ? "REVIEW" : trainingStats.totalActive > 0 ? "PERSONAL FOCUS" : "FROM YOUR GAMES"}
               </div>
-              <h3>See the forcing move.</h3>
-              <p>
-                Train yourself to look for checks, captures and threats before
-                committing to a move.
-              </p>
+              <h3>{recommendationTitle}</h3>
+              <p>{recommendationDescription}</p>
               <div className="feature-meta">
                 <span>
                   <Target size={13} /> Pattern recognition
@@ -197,9 +229,9 @@ export function DashboardView({
               </div>
               <button
                 className="button button-primary"
-                onClick={() => onNavigate("Train")}
+                onClick={startRecommendedAction}
               >
-                <Play size={14} fill="currentColor" /> Start a session{" "}
+                <Play size={14} fill="currentColor" /> {recommendationAction === "Review Queue" ? "Review due positions" : recommendationAction === "Train" ? "Practise this focus" : recommendationAction === "Analysis" ? "Review latest game" : "Import games"}{" "}
                 <ArrowRight size={14} />
               </button>
             </div>

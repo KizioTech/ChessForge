@@ -1,4 +1,5 @@
 import React from "react";
+import { Swords } from "lucide-react";
 import pkg from "../../package.json";
 import {
   Activity,
@@ -34,8 +35,9 @@ const navGroups = [
     label: "WORKSPACE",
     items: [
       { name: "Dashboard" as Page, icon: LayoutDashboard },
+      { name: "Play" as Page, icon: Swords },
       { name: "My Games" as Page, icon: FolderOpen },
-      { name: "Analysis" as Page, icon: Activity }
+      { name: "Analysis" as Page, icon: Activity },
     ]
   },
   {

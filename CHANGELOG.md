@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added local timed two-player play with legal move validation, saved PGN replays, and a personalized dashboard plan; preserved custom starting positions in game review.
+
 ### Hardening & Architectural Reliability (PR A through PR E)
 - **PR A — Core Correctness & Metrics**:
   - Persisted and tracked `consecutive_successes` across SM-2 spaced repetition attempts; exercises advance to `mastered` status after 5 consecutive successful reviews (`src/lib/training/training-service.ts`, `src/lib/training/types.ts`).

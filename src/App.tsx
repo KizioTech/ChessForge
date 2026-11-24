@@ -18,6 +18,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DashboardView } from "./components/DashboardView";
 import { AnalysisView } from "./components/AnalysisView";
 import { PlaceholderView } from "./components/PlaceholderView";
+import { PlayView } from "./components/PlayView";
 import { TrainingDesk } from "./components/TrainingDesk";
 import { ReviewQueue } from "./components/ReviewQueue";
 import { SettingsView } from "./components/SettingsView";
@@ -58,6 +59,7 @@ function App() {
   const [page, setPage] = useState<Page>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moves, setMoves] = useState<string[]>([]);
+  const [startFen, setStartFen] = useState<string | undefined>(undefined);
   const [selected, setSelected] = useState<Square | null>(null);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [showImport, setShowImport] = useState(false);
@@ -200,6 +202,7 @@ function App() {
   }, [user?.id, refreshTrainingStats]);
 
   function openAnalysisForGame(gameRecord: GameRecord, targetPly?: number) {
+
     // Clear prior analysis state whenever a new game is loaded
     setAnalysisPositions([]);
     setMoveReports([]);
@@ -208,6 +211,7 @@ function App() {
     setAnalysisAbortController(null);
     try {
       const chess = new Chess(gameRecord.start_fen || undefined);
+      setStartFen(gameRecord.start_fen);
       chess.loadPgn(gameRecord.pgn, { strict: false });
       const sanMoves = chess.history();
       setMoves(sanMoves);
@@ -232,6 +236,7 @@ function App() {
   }
 
   function handleClearActiveGame() {
+    setStartFen(undefined);
     analysisAbortController?.abort();
     setActiveGame(null);
     setMoves([]);
@@ -321,19 +326,19 @@ function App() {
 
   // Replay all moves up to the full length to build the "master" game state
   const game = useMemo(() => {
-    const g = new Chess();
+    const g = new Chess(startFen);
     moves.forEach(san => g.move(san));
     return g;
-  }, [moves]);
+  }, [moves, startFen]);
 
   const history = game.history({ verbose: true });
 
   // Build the display game up to historyIndex (for move navigation)
   const displayGame = useMemo(() => {
-    const g = new Chess();
+    const g = new Chess(startFen);
     history.slice(0, historyIndex).forEach(m => g.move(m.san));
     return g;
-  }, [historyIndex, history]);
+  }, [historyIndex, history, startFen]);
 
   const legalTargets = selected
     ? displayGame.moves({ square: selected, verbose: true }).map(m => m.to)
@@ -496,6 +501,16 @@ function App() {
             userId={user?.id}
           />
         )}
+        {page === "Play" && (
+          <PlayView
+            userId={user?.id}
+            playerName={profile?.display_name || user?.email?.split("@")[0] || "Player 1"}
+            onOpenAnalysis={gameRecord => {
+              refreshGames();
+              openAnalysisForGame(gameRecord);
+            }}
+          />
+        )}
         {page === "My Games" && (
           <GameLibrary
             games={games}
@@ -580,7 +595,7 @@ function App() {
             onOpenAnalysis={openAnalysisForGame}
           />
         )}
-        {page !== "Dashboard" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
+        {page !== "Dashboard" && page !== "Play" && page !== "My Games" && page !== "Analysis" && page !== "Train" && page !== "Review Queue" && page !== "Settings" && page !== "Analytics" && page !== "Openings" && page !== "Endgames" && (
           <PlaceholderView page={page} onImport={() => setShowImport(true)} onNavigate={setPage}/>
         )}
       </main>

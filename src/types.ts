@@ -1,5 +1,6 @@
 export type Page =
   | "Dashboard"
+  | "Play"
   | "My Games"
   | "Analysis"
   | "Train"
