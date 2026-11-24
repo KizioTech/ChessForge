@@ -21,3 +21,12 @@ public/stockfish-19.wasm
 build/*
 !build/icon.ico
 !build/icon.png
+
+# External investigation and benchmark records
+craft.json
+feed.json
+usage.json
+capture/
+inbox/
+investigation.cany/
+
